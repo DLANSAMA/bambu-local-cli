@@ -63,7 +63,7 @@ REQUIRED_WHEEL_DATA_SUFFIXES = {
 }
 
 STATIC_METADATA_SNIPPETS = {
-    "Summary: Local Bambu Lab printer control for agents and humans",
+    "Summary: Unofficial local Bambu Lab printer control for agents and humans (not affiliated with Bambu Lab)",
     "Keywords: bambu,3d-printing,agent,cli,orcaslicer",
     "Requires-Python: >=3.9",
     "Requires-Dist: paho-mqtt",
