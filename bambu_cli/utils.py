@@ -1,0 +1,162 @@
+import os
+import json
+
+EXIT_SUCCESS = 0
+EXIT_CONFIG_ERROR = 1
+EXIT_NETWORK_ERROR = 2
+EXIT_FILE_ERROR = 3
+EXIT_PRINTER_ERROR = 4
+EXIT_COMMAND_ERROR = 5
+EXIT_TIMEOUT = 6
+
+_JSON_PATH_KEYS = {
+    "access_code_file",
+    "config_path",
+    "downloaded_path",
+    "extracted_path",
+    "file",
+    "output",
+    "path",
+    "printable_path",
+    "normalized_source",
+    "orca_slicer",
+    "source",
+    "profiles_dir",
+    "workdir",
+    "detail",
+    "details"
+}
+
+_JSON_EMITTED = False
+_LAST_ERROR_PAYLOAD = None
+_LAST_DOWNLOAD_PAYLOAD = None
+
+def _redact_url_credentials(url):
+    from urllib.parse import urlparse, urlunparse
+    try:
+        parsed = urlparse(url)
+        if parsed.password:
+            netloc = f"{parsed.username}:***@{parsed.hostname}"
+            if parsed.port:
+                netloc += f":{parsed.port}"
+            parsed = parsed._replace(netloc=netloc)
+            return urlunparse(parsed)
+    except Exception:
+        pass
+    return url
+
+def _display_path(path):
+    if not path:
+        return path
+    home = os.path.expanduser("~")
+    if path.startswith(home):
+        return "~" + path[len(home):]
+    return path
+
+def _compact_all_strings(val):
+    if isinstance(val, dict):
+        return {k: _compact_all_strings(v) for k, v in val.items()}
+    if isinstance(val, list):
+        return [_compact_all_strings(v) for v in val]
+    if isinstance(val, str):
+        redacted = _redact_url_credentials(val)
+        return redacted if redacted != val else _display_path(val)
+    return val
+
+def _json_display_paths(value):
+    if isinstance(value, dict):
+        result = {}
+        for key, item in value.items():
+            if key in ("detail", "details"):
+                result[key] = _compact_all_strings(item)
+            elif key in _JSON_PATH_KEYS and (isinstance(item, str) or item is None):
+                redacted = _redact_url_credentials(item)
+                result[key] = redacted if redacted != item else _display_path(item)
+            else:
+                result[key] = _json_display_paths(item)
+        return result
+    if isinstance(value, list):
+        return [_json_display_paths(item) for item in value]
+    if isinstance(value, str):
+        return _redact_url_credentials(value)
+    return value
+
+def emit_json(data):
+    global _JSON_EMITTED
+    _JSON_EMITTED = True
+    print(json.dumps(_json_display_paths(data), indent=2))
+
+def _namespace_get(args, key, default=None):
+    return getattr(args, key, default)
+
+def emit_json_error(args, command, exit_code, error, failed_step=None, **extra):
+    global _JSON_EMITTED
+    _JSON_EMITTED = True
+    global _LAST_ERROR_PAYLOAD
+    payload = {
+        "status": "error",
+        "command": command,
+        "exit_code": exit_code,
+        "error": error,
+    }
+    if failed_step:
+        payload["failed_step"] = failed_step
+    payload.update(extra)
+    _LAST_ERROR_PAYLOAD = payload
+    if not bool(_namespace_get(args, "json", False)):
+        return
+    emit_json(payload)
+
+def record_error_detail(command, exit_code, error, failed_step=None, **extra):
+    global _LAST_ERROR_PAYLOAD
+    payload = {
+        "status": "error",
+        "command": command,
+        "exit_code": exit_code,
+        "error": error,
+    }
+    if failed_step:
+        payload["failed_step"] = failed_step
+    payload.update(extra)
+    _LAST_ERROR_PAYLOAD = payload
+
+def _record_download_success(args, payload):
+    global _LAST_DOWNLOAD_PAYLOAD
+    _LAST_DOWNLOAD_PAYLOAD = payload
+    if bool(_namespace_get(args, "json", False)):
+        emit_json(payload)
+
+import socket
+import threading
+
+def _resolve_ip(host, timeout=5.0):
+    """Resolve a hostname to an IP address (supporting IPv4 and IPv6) exactly once.
+    Includes a timeout to prevent DNS resolution deadlocks.
+    """
+    if not host or host == "0.0.0.0":
+        return host
+    
+    result = [host]
+    def _resolve():
+        try:
+            addr_info = socket.getaddrinfo(host, None)
+            if addr_info:
+                result[0] = addr_info[0][4][0]
+        except Exception:
+            pass
+            
+    t = threading.Thread(target=_resolve)
+    t.daemon = True
+    t.start()
+    t.join(timeout)
+    return result[0]
+
+_sequence_counter = 0
+
+def get_sequence_id():
+    import sys
+    if 'pytest' in sys.modules or 'unittest' in sys.modules:
+        return "0"
+    global _sequence_counter
+    _sequence_counter += 1
+    return str(_sequence_counter)

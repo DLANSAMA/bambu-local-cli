@@ -1,0 +1,57 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Dependencies / Virtualenvs
+node_modules/
+.venv/
+venv/
+env/
+bambu_venv/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Local config / secrets (never commit real printer credentials)
+.env
+.env.*
+config.json
+
+# Runtime artifacts written by the CLI
+temp_leaked_study/
+results.json
+printer_capabilities.json
+printer_snap.png
+cf.log
+
+# Ignore docs/md files inside node_modules or sub-dependencies
+**/node_modules/**/*.md
+**/node_modules/**/*.markdown
+
+# Build / release artifacts (uv/pip venvs, wheels, sdists)
+bin/
+lib/
+lib64
+pyvenv.cfg
+build/
+dist/
+wheelhouse/
+
+# CLI-generated runtime artifacts and local secrets
+access_code
+printer_snapshot.jpg
+*.3mf
+*.gcode
+
+# local artifacts
+.coverage
+.claude/
+.ruff_cache/
