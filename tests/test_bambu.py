@@ -2293,6 +2293,67 @@ class TestBambuCmdPrint(unittest.TestCase):
         )
         mock_execute.assert_called_once_with("test_payload", "test.gcode", dry_run=False)
 
+class TestGrabCameraFrameDirect(unittest.TestCase):
+
+    @patch('bambu_cli.bambu.socket.create_connection')
+    @patch('bambu_cli.bambu.ssl.create_default_context')
+    @patch('bambu_cli.bambu._expected_fingerprint')
+    def test_grab_camera_frame_direct_no_pin(self, mock_expected, mock_ssl, mock_create_conn):
+        from bambu_cli.bambu import _grab_camera_frame_direct
+        mock_expected.return_value = None
+        
+        mock_sock = MagicMock()
+        mock_create_conn.return_value = mock_sock
+        
+        mock_tls = MagicMock()
+        mock_ctx = MagicMock()
+        mock_ctx.wrap_socket.return_value = mock_tls
+        mock_ssl.return_value = mock_ctx
+        
+        # mock receiving a valid JPEG header and EOF
+        mock_tls.recv.side_effect = [
+            # first recv: size header (16 bytes)
+            (4).to_bytes(4, "little") + b"\x00" * 12,
+            # second recv: 4 bytes data representing valid JPEG
+            b"\xff\xd8\xff\xd9"
+        ]
+        
+        res = _grab_camera_frame_direct("192.168.1.100", "my_secret_code")
+        self.assertEqual(res, b"\xff\xd8\xff\xd9")
+        
+        # Verify socket and TLS operations
+        mock_create_conn.assert_called_once_with(("192.168.1.100", 6000), timeout=12)
+        mock_ctx.wrap_socket.assert_called_once_with(mock_sock, server_hostname="192.168.1.100")
+        mock_tls.sendall.assert_called_once()
+        mock_tls.getpeercert.assert_not_called()
+
+    @patch('bambu_cli.bambu.socket.create_connection')
+    @patch('bambu_cli.bambu.ssl.create_default_context')
+    @patch('bambu_cli.bambu._expected_fingerprint')
+    @patch('bambu_cli.bambu._verify_cert_fingerprint')
+    def test_grab_camera_frame_direct_with_pin(self, mock_verify, mock_expected, mock_ssl, mock_create_conn):
+        from bambu_cli.bambu import _grab_camera_frame_direct
+        mock_expected.return_value = "mock_fingerprint"
+        
+        mock_sock = MagicMock()
+        mock_create_conn.return_value = mock_sock
+        
+        mock_tls = MagicMock()
+        mock_tls.getpeercert.return_value = b"der_cert"
+        mock_ctx = MagicMock()
+        mock_ctx.wrap_socket.return_value = mock_tls
+        mock_ssl.return_value = mock_ctx
+        
+        mock_tls.recv.side_effect = [
+            (4).to_bytes(4, "little") + b"\x00" * 12,
+            b"\xff\xd8\xff\xd9"
+        ]
+        
+        res = _grab_camera_frame_direct("192.168.1.100", "my_secret_code")
+        self.assertEqual(res, b"\xff\xd8\xff\xd9")
+        
+        mock_verify.assert_called_once_with(b"der_cert", "192.168.1.100")
+
 class TestBambuCmdSnapshot(unittest.TestCase):
 
     @patch('bambu_cli.bambu.logger')

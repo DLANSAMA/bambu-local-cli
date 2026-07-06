@@ -1652,6 +1652,9 @@ def _grab_camera_frame_direct(ip, access_code, username="bblp", timeout=12):
     sock = socket.create_connection((ip, 6000), timeout=timeout)
     try:
         tls = ctx.wrap_socket(sock, server_hostname=ip)
+        pin = _expected_fingerprint()
+        if pin:
+            _verify_cert_fingerprint(tls.getpeercert(binary_form=True), ip)
         tls.settimeout(timeout)
         tls.sendall(bytes(auth))
         for _ in range(30):

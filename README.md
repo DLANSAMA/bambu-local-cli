@@ -20,7 +20,7 @@ pip install .
 
 - **Jobs & URL Support** — Use `job` when an agent or user gives either a website URL or a local file path. It handles everything in one shot.
 - **Safe Extraction** — ZIP archives containing model files are fully supported. Existing files are kept safe by creating a numbered sibling such as `model-1.stl`. URL downloads and ZIP extraction have a 2048 MB safety limit, adjustable via `--max-download-mb`.
-- **Modularity** — Run steps individually using `extract`, `slice`, `upload`, or `print`.
+- **Modularity** — Run steps individually using `download`, `slice`, `upload`, or `print`.
 - **Safety First** — The one-shot command will not start a print unless `--confirm` is present.
 - **Diagnostics** — Network, FTPS, and MQTT health checking with `doctor` and `preflight`.
 
