@@ -142,3 +142,15 @@ jobs:
           python tests/package_contents_smoke.py
           python tests/python_compat_smoke.py
           python tests/privacy_smoke.py --include-dist
+
+  lint:
+    name: Lint (ruff + bandit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+      - name: ruff (blocking, correctness rules only)
+        run: uvx ruff check bambu_cli
+      - name: bandit (non-blocking)
+        run: uvx bandit -c pyproject.toml -r bambu_cli -ll || true
