@@ -72,7 +72,7 @@ jobs:
           python -m pytest --cov=bambu_cli
 
       - name: Syntax smoke
-        run: python -m py_compile bambu_cli/__init__.py bambu_cli/bambu.py bambu_cli/cli.py bambu_cli/config.py bambu_cli/slicer.py bambu_cli/commands.py bambu_cli/protocols/ftps.py bambu_cli/protocols/mqtt.py scripts/bambu.py tests/test_bambu.py tests/agent_cli_smoke.py tests/ci_workflow_smoke.py tests/dependency_resolution_smoke.py tests/live_printer_smoke.py tests/package_contents_smoke.py tests/privacy_smoke.py tests/python_compat_smoke.py tests/release_readiness_smoke.py scripts/__init__.py
+        run: python -m py_compile bambu_cli/__init__.py bambu_cli/bambu.py bambu_cli/cli.py bambu_cli/config.py bambu_cli/constants.py bambu_cli/slicer.py bambu_cli/commands.py bambu_cli/download.py bambu_cli/job.py bambu_cli/setup_cmd.py bambu_cli/camera.py bambu_cli/printer.py bambu_cli/utils.py bambu_cli/logging_utils.py bambu_cli/protocols/ftps.py bambu_cli/protocols/mqtt.py scripts/bambu.py tests/test_bambu.py tests/agent_cli_smoke.py tests/ci_workflow_smoke.py tests/dependency_resolution_smoke.py tests/live_printer_smoke.py tests/package_contents_smoke.py tests/privacy_smoke.py tests/python_compat_smoke.py tests/release_readiness_smoke.py scripts/__init__.py
 
       - name: CI workflow smoke
         run: python tests/ci_workflow_smoke.py

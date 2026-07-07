@@ -15,8 +15,23 @@ The core interaction with the printer is handled via the `BambuPrinter` class lo
 Agents interacting directly with the codebase should instantiate this class via the `get_printer()` factory instead of manipulating globals.
 - `BambuPrinter` handles FTPS and MQTT connections.
 - Set `insecure_tls = False` and supply the `cert_fingerprint` to ensure MITM protection. All TLS channels (MQTT, FTPS, camera port 6000) fail closed when no fingerprint is pinned and `insecure_tls` is not set.
-- The `bambu.py` script acts as a legacy bridge. When implementing new agent capabilities, write modular commands in `bambu_cli/commands.py` leveraging the `BambuPrinter` object.
 - Network operations (like MQTT request-response) support `timeout` and `retries` out of the box through `printer.send_command()` and `printer.status()`.
+
+### Module layout
+Logic lives in focused modules; `bambu_cli/bambu.py` is a thin entry point that
+holds config-derived runtime state (`SIMULATION_MODE`, `PRINTER_IP`, ...) and
+re-exports every helper as a stable compatibility facade for tests and scripts.
+- `cli.py` — argparse setup, `main()` dispatch, path/JSON message helpers
+- `commands.py` — printer subcommand handlers (status, upload, print, doctor, ...)
+- `download.py` — SSRF-safe HTTP, URL/filename validation, ZIP extraction, Printables GraphQL
+- `job.py` — one-shot `job`/`send` orchestration, dry-run prediction, print payloads
+- `setup_cmd.py` — guided/non-interactive setup, mDNS discovery, preflight checks
+- `camera.py` — snapshot capture (direct port-6000 grab + Docker streamer fallback)
+- `slicer.py` — OrcaSlicer integration; `config.py` — config load/apply, timeouts
+- `constants.py` — exit codes, file-type tables, safety limits (immutable)
+- `protocols/` — low-level FTPS and MQTT clients used by `BambuPrinter`
+New command logic goes in `commands.py` (or a new focused module) using
+`get_printer()`; add a re-export in `bambu.py` if tests or agents need to patch it.
 
 ## Agent Usage
 Agents may place `--json` before or after the subcommand; `bambu-cli --json --version` emits machine-readable version details. Slicing accepts meshes in the precedence order STL > STEP/STP > OBJ > 3MF > G-code. AMS slot mappings are zero-or-positive integers.

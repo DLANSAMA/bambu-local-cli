@@ -37,10 +37,15 @@ Copy the `bambu-cli` folder into your workspace:
 ├── pyproject.toml    # Optional installed `bambu-cli` command
 ├── requirements.txt  # Runtime Python dependencies
 ├── bambu_cli/
-│   ├── bambu.py      # Legacy core module used by installed command
+│   ├── bambu.py      # Thin entry point: runtime state + compat facade
 │   ├── cli.py        # Argument parsing and command dispatch
-│   ├── commands.py   # Modular subcommand implementations
-│   ├── config.py     # Config loading and platform path detection
+│   ├── commands.py   # Printer subcommand handlers (status, upload, print, ...)
+│   ├── constants.py  # Exit codes, file-type tables, safety limits
+│   ├── config.py     # Config loading, timeouts, platform path detection
+│   ├── download.py   # SSRF-safe downloads, ZIP/HTML/Printables resolution
+│   ├── job.py        # One-shot job orchestration and dry-run prediction
+│   ├── setup_cmd.py  # Guided/non-interactive setup and preflight checks
+│   ├── camera.py     # Camera snapshot capture (direct + Docker streamer)
 │   ├── printer.py    # BambuPrinter class (FTPS + MQTT client)
 │   ├── slicer.py     # OrcaSlicer integration
 │   └── protocols/    # FTPS and MQTT protocol helpers
@@ -507,7 +512,7 @@ Before shipping changes, run the full local release stack from the repository ro
 On Windows, replace `python3` with `python` or `py` in the commands below.
 
 ```bash
-python3 -m py_compile bambu_cli/__init__.py bambu_cli/bambu.py bambu_cli/cli.py bambu_cli/config.py bambu_cli/slicer.py bambu_cli/commands.py bambu_cli/printer.py bambu_cli/protocols/ftps.py bambu_cli/protocols/mqtt.py scripts/bambu.py tests/test_bambu.py tests/agent_cli_smoke.py tests/ci_workflow_smoke.py tests/dependency_resolution_smoke.py tests/live_printer_smoke.py tests/package_contents_smoke.py tests/privacy_smoke.py tests/python_compat_smoke.py tests/release_readiness_smoke.py scripts/__init__.py
+python3 -m py_compile bambu_cli/__init__.py bambu_cli/bambu.py bambu_cli/cli.py bambu_cli/config.py bambu_cli/constants.py bambu_cli/slicer.py bambu_cli/commands.py bambu_cli/download.py bambu_cli/job.py bambu_cli/setup_cmd.py bambu_cli/camera.py bambu_cli/printer.py bambu_cli/utils.py bambu_cli/logging_utils.py bambu_cli/protocols/ftps.py bambu_cli/protocols/mqtt.py scripts/bambu.py tests/test_bambu.py tests/agent_cli_smoke.py tests/ci_workflow_smoke.py tests/dependency_resolution_smoke.py tests/live_printer_smoke.py tests/package_contents_smoke.py tests/privacy_smoke.py tests/python_compat_smoke.py tests/release_readiness_smoke.py scripts/__init__.py
 python3 -W error::ResourceWarning -m unittest tests.test_bambu
 python3 tests/agent_cli_smoke.py
 python3 tests/privacy_smoke.py

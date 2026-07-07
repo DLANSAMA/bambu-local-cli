@@ -1308,7 +1308,7 @@ class TestResolvePrintablesUrl(unittest.TestCase):
         self.assertEqual(result, (None, None))
         mock_logger.error.assert_called_with("Failed to get download link: Link Fetch Error")
 
-    @patch('bambu_cli.bambu.build_safe_opener')
+    @patch('bambu_cli.download.build_safe_opener')
     @patch('bambu_cli.bambu.logger')
     def test_resolve_printables_url_success(self, mock_logger, mock_safe_opener):
         mock_urlopen = mock_safe_opener.return_value.open
@@ -1357,7 +1357,7 @@ class TestResolvePrintablesUrl(unittest.TestCase):
         self.assertIsNone(download_url)
         self.assertIsNone(filename)
 
-    @patch('bambu_cli.bambu.build_safe_opener')
+    @patch('bambu_cli.download.build_safe_opener')
     @patch('bambu_cli.bambu.logger')
     def test_resolve_printables_model_not_found(self, mock_logger, mock_safe_opener):
         mock_urlopen = mock_safe_opener.return_value.open
@@ -1376,7 +1376,7 @@ class TestResolvePrintablesUrl(unittest.TestCase):
 
         self.assertTrue(any("Model #12345 not found on Printables" in call[0][0] for call in mock_logger.error.call_args_list))
 
-    @patch('bambu_cli.bambu.build_safe_opener')
+    @patch('bambu_cli.download.build_safe_opener')
     @patch('bambu_cli.bambu.logger')
     def test_resolve_printables_no_valid_files(self, mock_logger, mock_safe_opener):
         mock_urlopen = mock_safe_opener.return_value.open
@@ -1403,7 +1403,7 @@ class TestResolvePrintablesUrl(unittest.TestCase):
 
         self.assertTrue(any("No STL, STEP, or 3MF files found for this model" in call[0][0] for call in mock_logger.error.call_args_list))
 
-    @patch('bambu_cli.bambu.build_safe_opener')
+    @patch('bambu_cli.download.build_safe_opener')
     @patch('bambu_cli.bambu.logger')
     def test_resolve_printables_prioritize_step(self, mock_logger, mock_safe_opener):
         mock_urlopen = mock_safe_opener.return_value.open
@@ -1441,7 +1441,7 @@ class TestResolvePrintablesUrl(unittest.TestCase):
 
         self.assertTrue(any("→ Using STEP: part1.step (1KB)" in call[0][0] for call in mock_logger.info.call_args_list))
 
-    @patch('bambu_cli.bambu.build_safe_opener')
+    @patch('bambu_cli.download.build_safe_opener')
     @patch('bambu_cli.bambu.logger')
     def test_resolve_printables_prioritize_3mf(self, mock_logger, mock_safe_opener):
         mock_urlopen = mock_safe_opener.return_value.open
@@ -1480,7 +1480,7 @@ class TestResolvePrintablesUrl(unittest.TestCase):
         self.assertTrue(any("falling back to 3MF" in call[0][0] for call in mock_logger.warning.call_args_list))
         self.assertTrue(any("→ Using 3MF: part1.3mf (1KB)" in call[0][0] for call in mock_logger.info.call_args_list))
 
-    @patch('bambu_cli.bambu.build_safe_opener')
+    @patch('bambu_cli.download.build_safe_opener')
     @patch('bambu_cli.bambu.logger')
     def test_resolve_printables_download_link_error(self, mock_logger, mock_safe_opener):
         mock_urlopen = mock_safe_opener.return_value.open
@@ -1518,7 +1518,7 @@ class TestResolvePrintablesUrl(unittest.TestCase):
 
         self.assertTrue(any("Failed to get download link: Download limit reached" in call[0][0] for call in mock_logger.error.call_args_list))
 
-    @patch('bambu_cli.bambu.build_safe_opener')
+    @patch('bambu_cli.download.build_safe_opener')
     @patch('bambu_cli.bambu.logger')
     def test_resolve_printables_exception(self, mock_logger, mock_safe_opener):
         mock_urlopen = mock_safe_opener.return_value.open
@@ -1551,7 +1551,7 @@ class TestBambuCmdDownload(unittest.TestCase):
         mock_logger.error.assert_called_with("Invalid output directory: -invalid_dir")
 
     @patch('urllib.request.Request')
-    @patch('bambu_cli.bambu.build_safe_opener')
+    @patch('bambu_cli.download.build_safe_opener')
     @patch('bambu_cli.bambu.logger')
     @patch('builtins.open', new_callable=mock_open)
     def test_cmd_download_sanitization_fallback(self, mock_file, mock_logger, mock_build, mock_req):
@@ -1577,7 +1577,7 @@ class TestBambuCmdDownload(unittest.TestCase):
         mock_file.assert_called_with(os.path.join("/tmp/out", "model.stl"), 'wb')
         mock_logger.info.assert_any_call("⬇️  Downloading model.stl...")
     def setUp(self):
-        self.safe_opener_patcher = patch('bambu_cli.bambu.build_safe_opener')
+        self.safe_opener_patcher = patch('bambu_cli.download.build_safe_opener')
         self.mock_safe_opener = self.safe_opener_patcher.start()
         self.mock_safe_opener.return_value.open = MagicMock()
         self.exists_patcher = patch('os.path.exists', return_value=False)
@@ -1591,8 +1591,8 @@ class TestBambuCmdDownload(unittest.TestCase):
         self.getsize_patcher.stop()
 
 
-    @patch('bambu_cli.bambu.resolve_printables_url')
-    @patch('bambu_cli.bambu.build_safe_opener')
+    @patch('bambu_cli.download.resolve_printables_url')
+    @patch('bambu_cli.download.build_safe_opener')
     @patch('os.path.getsize')
     @patch('builtins.open', new_callable=unittest.mock.mock_open)
     @patch('bambu_cli.bambu.logger')
@@ -1623,8 +1623,8 @@ class TestBambuCmdDownload(unittest.TestCase):
         # Check success message
         self.assertTrue(any("✅ Downloaded: ./part1.stl" in call[0][0] for call in mock_logger.info.call_args_list))
 
-    @patch('bambu_cli.bambu.resolve_printables_url')
-    @patch('bambu_cli.bambu.build_safe_opener')
+    @patch('bambu_cli.download.resolve_printables_url')
+    @patch('bambu_cli.download.build_safe_opener')
     @patch('os.path.getsize')
     @patch('builtins.open', new_callable=unittest.mock.mock_open)
     @patch('bambu_cli.bambu.logger')
@@ -1654,8 +1654,8 @@ class TestBambuCmdDownload(unittest.TestCase):
         # Check success message
         self.assertTrue(any("✅ Downloaded: ./model.stl (1KB)" in call[0][0] for call in mock_logger.info.call_args_list))
 
-    @patch('bambu_cli.bambu.resolve_printables_url')
-    @patch('bambu_cli.bambu.build_safe_opener')
+    @patch('bambu_cli.download.resolve_printables_url')
+    @patch('bambu_cli.download.build_safe_opener')
     @patch('os.path.getsize')
     @patch('builtins.open', new_callable=unittest.mock.mock_open)
     @patch('bambu_cli.bambu.logger')
@@ -1685,8 +1685,8 @@ class TestBambuCmdDownload(unittest.TestCase):
         # Check success message
         self.assertTrue(any("✅ Downloaded: ./custom.stl (1KB)" in call[0][0] for call in mock_logger.info.call_args_list))
 
-    @patch('bambu_cli.bambu.resolve_printables_url')
-    @patch('bambu_cli.bambu.build_safe_opener')
+    @patch('bambu_cli.download.resolve_printables_url')
+    @patch('bambu_cli.download.build_safe_opener')
     @patch('bambu_cli.bambu.logger')
     def test_cmd_download_printables_fail(self, mock_logger, mock_safe_opener, mock_resolve):
         mock_urlopen = mock_safe_opener.return_value.open
@@ -1706,8 +1706,8 @@ class TestBambuCmdDownload(unittest.TestCase):
         mock_resolve.assert_called_once_with("https://www.printables.com/model/12345")
         mock_urlopen.assert_not_called()
 
-    @patch('bambu_cli.bambu.resolve_printables_url')
-    @patch('bambu_cli.bambu.build_safe_opener')
+    @patch('bambu_cli.download.resolve_printables_url')
+    @patch('bambu_cli.download.build_safe_opener')
     @patch('bambu_cli.bambu.logger')
     def test_cmd_download_http_error(self, mock_logger, mock_safe_opener, mock_resolve):
         mock_urlopen = mock_safe_opener.return_value.open
@@ -1732,8 +1732,8 @@ class TestBambuCmdDownload(unittest.TestCase):
 
         self.assertTrue(any("Download failed: HTTP Error 404" in call[0][0] for call in mock_logger.error.call_args_list))
 
-    @patch('bambu_cli.bambu.resolve_printables_url')
-    @patch('bambu_cli.bambu.build_safe_opener')
+    @patch('bambu_cli.download.resolve_printables_url')
+    @patch('bambu_cli.download.build_safe_opener')
     @patch('bambu_cli.bambu.logger')
     def test_cmd_download_generic_error(self, mock_logger, mock_safe_opener, mock_resolve):
         mock_urlopen = mock_safe_opener.return_value.open
@@ -1757,8 +1757,8 @@ class TestBambuCmdDownload(unittest.TestCase):
 
         self.assertTrue(any("Network error during download: <urlopen error Connection refused>" in call[0][0] for call in mock_logger.error.call_args_list))
 
-    @patch('bambu_cli.bambu.resolve_printables_url')
-    @patch('bambu_cli.bambu.build_safe_opener')
+    @patch('bambu_cli.download.resolve_printables_url')
+    @patch('bambu_cli.download.build_safe_opener')
     @patch('os.path.getsize')
     @patch('builtins.open', new_callable=unittest.mock.mock_open)
     @patch('bambu_cli.bambu.logger')
@@ -1788,8 +1788,8 @@ class TestBambuCmdDownload(unittest.TestCase):
         # Check success message with .stl appended
         self.assertTrue(any("✅ Downloaded: ./model.stl (1KB)" in call[0][0] for call in mock_logger.info.call_args_list))
 
-    @patch('bambu_cli.bambu.resolve_printables_url')
-    @patch('bambu_cli.bambu.build_safe_opener')
+    @patch('bambu_cli.download.resolve_printables_url')
+    @patch('bambu_cli.download.build_safe_opener')
     @patch('bambu_cli.bambu.logger')
     def test_cmd_download_invalid_scheme(self, mock_logger, mock_safe_opener, mock_resolve):
         mock_urlopen = mock_safe_opener.return_value.open
@@ -1812,8 +1812,8 @@ class TestBambuCmdDownload(unittest.TestCase):
         # Check for invalid scheme error message
         self.assertTrue(any("Invalid URL scheme: file" in call[0][0] for call in mock_logger.error.call_args_list))
 
-    @patch('bambu_cli.bambu.resolve_printables_url')
-    @patch('bambu_cli.bambu.build_safe_opener')
+    @patch('bambu_cli.download.resolve_printables_url')
+    @patch('bambu_cli.download.build_safe_opener')
     @patch('os.path.getsize')
     @patch('builtins.open', new_callable=unittest.mock.mock_open)
     @patch('bambu_cli.bambu.logger')
@@ -2729,7 +2729,7 @@ class TestBambuSecurity(unittest.TestCase):
         args.output = "/tmp"
         args.name = None
 
-        with patch('bambu_cli.bambu.build_safe_opener'), \
+        with patch('bambu_cli.download.build_safe_opener'), \
              patch('builtins.open', mock_open()), \
              patch('os.path.getsize', return_value=1024):
             cmd_download(args)

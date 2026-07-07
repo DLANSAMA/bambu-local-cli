@@ -1,13 +1,34 @@
 import os
 import json
 
-EXIT_SUCCESS = 0
-EXIT_CONFIG_ERROR = 1
-EXIT_NETWORK_ERROR = 2
-EXIT_FILE_ERROR = 3
-EXIT_PRINTER_ERROR = 4
-EXIT_COMMAND_ERROR = 5
-EXIT_TIMEOUT = 6
+from .constants import (
+    EXIT_SUCCESS, EXIT_CONFIG_ERROR, EXIT_NETWORK_ERROR, EXIT_FILE_ERROR,
+    EXIT_PRINTER_ERROR, EXIT_COMMAND_ERROR, EXIT_TIMEOUT,
+)
+
+def _secure_makedirs(path, exist_ok=True):
+    os.makedirs(path, mode=0o700, exist_ok=True)
+
+
+def _ensure_output_dir(path):
+    """Create an output directory before expensive work starts."""
+    import sys
+    from bambu_cli.logging_utils import logger
+    try:
+        _secure_makedirs(path, exist_ok=True)
+    except OSError as e:
+        from bambu_cli.cli import _path_for_message, _exception_for_message
+        logger.error(f"Could not create output directory {_path_for_message(path)}: {_exception_for_message(e)}")
+        sys.exit(EXIT_FILE_ERROR)
+
+
+def _ensure_parent_dir(path):
+    """Create the parent directory for an output file when one was supplied."""
+    from bambu_cli.cli import _expand_path
+    parent = os.path.dirname(_expand_path(path))
+    if parent:
+        _ensure_output_dir(parent)
+
 
 _JSON_PATH_KEYS = {
     "access_code_file",

@@ -5,19 +5,18 @@ import logging
 import socket
 from urllib.parse import urlparse, urlunparse
 import bambu_cli.utils as utils
-from .utils import emit_json, emit_json_error, EXIT_SUCCESS, EXIT_CONFIG_ERROR, EXIT_NETWORK_ERROR, EXIT_FILE_ERROR, EXIT_PRINTER_ERROR, EXIT_COMMAND_ERROR, EXIT_TIMEOUT
-
-
-# Exit Codes
-EXIT_SUCCESS = 0
-EXIT_CONFIG_ERROR = 1
-EXIT_NETWORK_ERROR = 2
-EXIT_FILE_ERROR = 3
-EXIT_PRINTER_ERROR = 4
-EXIT_COMMAND_ERROR = 5
-EXIT_TIMEOUT = 6
-
-DEFAULT_MAX_DOWNLOAD_MB = 2048
+from .utils import emit_json, emit_json_error
+from .constants import (
+    EXIT_SUCCESS, EXIT_CONFIG_ERROR, EXIT_NETWORK_ERROR, EXIT_FILE_ERROR,
+    EXIT_PRINTER_ERROR, EXIT_COMMAND_ERROR, EXIT_TIMEOUT,
+    DEFAULT_MAX_DOWNLOAD_MB,
+    BED_PLATE_TYPES, SLICEABLE_EXTENSIONS, PRINT_READY_EXTENSIONS,
+    DOWNLOADABLE_EXTENSIONS, ARCHIVE_DOWNLOAD_EXTENSIONS,
+    DOWNLOAD_LINK_EXTENSION_PRIORITY, KNOWN_UNSUPPORTED_DOWNLOAD_EXTENSIONS,
+    KNOWN_UNSUPPORTED_CONTENT_TYPES, WINDOWS_RESERVED_FILENAMES,
+    MAX_DOWNLOAD_FILENAME_LENGTH, DOWNLOAD_CANDIDATE_EXTENSIONS,
+    PRINTER_CONFIG_COMMANDS, LOCAL_COMMANDS, PRINTER_NETWORK_COMMANDS,
+)
 
 
 # Logging
@@ -92,52 +91,6 @@ class JsonArgumentParser(argparse.ArgumentParser):
             "error": message,
         })
         self.exit(EXIT_COMMAND_ERROR)
-
-
-BED_PLATE_TYPES = ['cool_plate_temp', 'hot_plate_temp', 'textured_plate_temp', 'eng_plate_temp']
-SLICEABLE_EXTENSIONS = ('.stl', '.step', '.stp', '.obj')
-PRINT_READY_EXTENSIONS = ('.3mf', '.gcode')
-DOWNLOADABLE_EXTENSIONS = SLICEABLE_EXTENSIONS + PRINT_READY_EXTENSIONS
-ARCHIVE_DOWNLOAD_EXTENSIONS = ('.zip',)
-DOWNLOAD_LINK_EXTENSION_PRIORITY = {
-    ".stl": 0,
-    ".step": 1,
-    ".stp": 1,
-    ".obj": 2,
-    ".3mf": 3,
-    ".gcode": 4,
-    ".zip": 5,
-}
-KNOWN_UNSUPPORTED_DOWNLOAD_EXTENSIONS = {
-    ".rar", ".7z", ".tar", ".gz", ".bz2", ".xz",
-    ".pdf", ".txt",
-    ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg",
-}
-KNOWN_UNSUPPORTED_CONTENT_TYPES = {
-    "application/json",
-    "application/pdf",
-    "application/x-7z-compressed",
-    "application/x-bzip2",
-    "application/x-gzip",
-    "application/x-rar-compressed",
-    "application/x-tar",
-    "text/csv",
-    "text/plain",
-    "text/xml",
-}
-WINDOWS_RESERVED_FILENAMES = {
-    "CON", "PRN", "AUX", "NUL",
-    *(f"COM{i}" for i in range(1, 10)),
-    *(f"LPT{i}" for i in range(1, 10)),
-}
-MAX_DOWNLOAD_FILENAME_LENGTH = 160
-DOWNLOAD_CANDIDATE_EXTENSIONS = DOWNLOADABLE_EXTENSIONS + ARCHIVE_DOWNLOAD_EXTENSIONS
-PRINTER_CONFIG_COMMANDS = {
-    "status", "light", "pause", "resume", "stop", "upload", "files",
-    "print", "job", "send", "delete", "snapshot", "gcode", "doctor",
-}
-LOCAL_COMMANDS = {"slice", "download", "preflight", "setup"}
-PRINTER_NETWORK_COMMANDS = PRINTER_CONFIG_COMMANDS - LOCAL_COMMANDS
 
 
 def _expand_path(path):
@@ -429,7 +382,7 @@ def _setup_args_provided(args):
 def main():
     from bambu_cli import bambu
     utils._JSON_EMITTED = False
-    bambu._LAST_ERROR_PAYLOAD = None
+    utils._LAST_ERROR_PAYLOAD = None
     parser = build_parser()
     args = parser.parse_args()
     if getattr(args, "version", False):

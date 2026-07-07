@@ -477,7 +477,8 @@ def cmd_print(args):
     try:
         from bambu_cli.printer import get_printer
         printer = get_printer()
-        bambu._LAST_ERROR_PAYLOAD = None
+        from bambu_cli import utils as _utils
+        _utils._LAST_ERROR_PAYLOAD = None
         bambu.execute_print_command(printer, payload, basename, dry_run=dry_run)
     except SystemExit as exc:
         exit_code = bambu._exit_code_from_system_exit(exc)

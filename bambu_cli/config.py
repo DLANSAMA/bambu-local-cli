@@ -239,3 +239,38 @@ def fingerprint_sha256(der_cert):
     if not der_cert:
         return None
     return hashlib.sha256(der_cert).hexdigest()
+
+
+def _timeout_from(args, key, default):
+    """Resolve a timeout from CLI args, then config, then the default."""
+    from bambu_cli import bambu
+    from bambu_cli.cli import _namespace_get
+    if args:
+        val = _namespace_get(args, key)
+        if val is not None:
+            return float(val)
+    if bambu._cfg:
+        val = bambu._cfg.get(key)
+        if val is not None:
+            return float(val)
+    return default
+
+
+def get_network_timeout(args=None):
+    from bambu_cli.constants import DEFAULT_NETWORK_TIMEOUT
+    return _timeout_from(args, "network_timeout", DEFAULT_NETWORK_TIMEOUT)
+
+
+def get_slicer_timeout(args=None):
+    from bambu_cli.constants import SLICER_TIMEOUT
+    return _timeout_from(args, "slicer_timeout", SLICER_TIMEOUT)
+
+
+def get_command_timeout(args=None):
+    from bambu_cli.constants import COMMAND_TIMEOUT
+    return _timeout_from(args, "command_timeout", COMMAND_TIMEOUT)
+
+
+def get_upload_timeout(args=None):
+    from bambu_cli.constants import UPLOAD_TIMEOUT
+    return _timeout_from(args, "upload_timeout", UPLOAD_TIMEOUT)
