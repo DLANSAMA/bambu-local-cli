@@ -680,7 +680,8 @@ def _get_printables_file_info(model_id, gql_headers, opener):
     """Helper to fetch file info from Printables API."""
 
     payload = json.dumps({
-        "query": 'query{print(id:"' + model_id + '"){name stls{name fileSize id} gcodes{name fileSize id}}}'
+        "variables": {"id": model_id},
+        "query": "query($id: ID!){print(id: $id){name stls{name fileSize id} gcodes{name fileSize id}}}",
     })
     req = urllib.request.Request('https://api.printables.com/graphql/',
         data=payload.encode(), headers=gql_headers)

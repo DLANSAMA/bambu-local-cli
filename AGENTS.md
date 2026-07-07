@@ -33,6 +33,10 @@ re-exports every helper as a stable compatibility facade for tests and scripts.
 New command logic goes in `commands.py` (or a new focused module) using
 `get_printer()`; add a re-export in `bambu.py` if tests or agents need to patch it.
 
+When adding tests, follow the conventions and prioritized gap list in
+`docs/test-backlog.md` (patch targets, JSON-contract assertions, no new
+test-awareness branches in production code).
+
 ## Agent Usage
 Agents may place `--json` before or after the subcommand; `bambu-cli --json --version` emits machine-readable version details. Slicing accepts meshes in the precedence order STL > STEP/STP > OBJ > 3MF > G-code. AMS slot mappings are zero-or-positive integers.
 

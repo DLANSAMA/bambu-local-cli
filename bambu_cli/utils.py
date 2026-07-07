@@ -7,7 +7,7 @@ from .constants import (
 )
 
 def _secure_makedirs(path, exist_ok=True):
-    os.makedirs(path, mode=0o700, exist_ok=True)
+    os.makedirs(path, mode=0o700, exist_ok=exist_ok)
 
 
 def _ensure_output_dir(path):
