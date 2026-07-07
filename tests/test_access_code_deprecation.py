@@ -45,15 +45,18 @@ class TestInlineAccessCodeWarning(ResetWarnFlagMixin, unittest.TestCase):
         with patch("bambu_cli.cli._expand_path", return_value="/tmp/does-not-matter"), \
              patch("builtins.open", side_effect=lambda *a, **k: _fake_file("filecode\n")):
             bambu._cfg = {"access_code_file": "/tmp/does-not-matter"}
-            with self.assertNoLogs("bambu", level="WARNING"):
+            # assertNoLogs needs Python 3.10+; assert via the logger mock instead.
+            with patch.object(config.logger, "warning") as mock_warn:
                 config.load_access_code()
+            mock_warn.assert_not_called()
 
     def test_no_warning_when_both_inline_and_file_present(self):
         # access_code branch is checked first, but if access_code_file is also
         # configured we should not nag about migrating (nothing to migrate to).
         bambu._cfg = {"access_code": "SECRET123", "access_code_file": "/tmp/somewhere"}
-        with self.assertNoLogs("bambu", level="WARNING"):
+        with patch.object(config.logger, "warning") as mock_warn:
             config.load_access_code()
+        mock_warn.assert_not_called()
 
     def test_no_warning_with_no_config(self):
         # Simulation / no-config: _cfg empty, neither key present -> error path,
