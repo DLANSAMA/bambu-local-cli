@@ -67,9 +67,9 @@ For programmatic checks, `bambu-cli --json --version` emits JSON version details
 | `printer_ip` | ✅ | — | Printer's LAN IP address |
 | `serial` | ✅ | — | Printer serial number |
 | `access_code_file` | ✅* | — | Path to file containing access code (recommended) |
-| `access_code` | ✅* | — | Printer access code inline in config |
+| `access_code` | ✅* | — | Printer access code inline in config (**deprecated**; migrate with `bambu setup --migrate-access-code`) |
 
-*Either `access_code_file` or `access_code` is required. See the packaged [bambu_cli/README.md](bambu_cli/README.md) for the full key reference (`cert_fingerprint`, `orca_slicer`, `profiles_dir`, etc.).
+*Either `access_code_file` or `access_code` is required, but inline `access_code` is deprecated and will be removed in a future release. See the packaged [bambu_cli/README.md](bambu_cli/README.md) for the full key reference (`cert_fingerprint`, `orca_slicer`, `profiles_dir`, etc.).
 
 ## License
 

@@ -178,11 +178,34 @@ def apply_config(cfg):
     bambu.CAMERA_STREAM_URL = cfg.get("camera_stream_url", f"http://localhost:{host_port}/api/frame.jpeg?src=p1s")
 
 
+_INLINE_ACCESS_CODE_WARNED = False
+
+INLINE_ACCESS_CODE_DEPRECATION_MESSAGE = (
+    "config.json contains an inline access_code; move it to an access_code_file "
+    "(run: bambu setup --migrate-access-code or edit config). "
+    "Inline support will be removed in a future release."
+)
+
+
+def _warn_inline_access_code_once():
+    """Emit a one-time-per-process stderr warning about inline access_code use.
+
+    Never logs the access code value itself; deduplicated via a module-level flag.
+    """
+    global _INLINE_ACCESS_CODE_WARNED
+    if _INLINE_ACCESS_CODE_WARNED:
+        return
+    _INLINE_ACCESS_CODE_WARNED = True
+    logger.warning(INLINE_ACCESS_CODE_DEPRECATION_MESSAGE)
+
+
 def load_access_code():
     from bambu_cli import bambu
     from bambu_cli.cli import _expand_path, _display_path, _exception_for_message
     from bambu_cli.constants import EXIT_CONFIG_ERROR
     if "access_code" in bambu._cfg:
+        if not bambu._cfg.get("access_code_file"):
+            _warn_inline_access_code_once()
         access_code = str(bambu._cfg["access_code"]).strip()
         problem = _access_code_value_problem(access_code)
         if problem:

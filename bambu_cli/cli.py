@@ -339,6 +339,7 @@ def build_parser():
     p_setup.add_argument("--cert-fingerprint", help="SHA-256 fingerprint to pin the printer TLS certificate")
     p_setup.add_argument("--insecure-tls", action="store_true", help="Disable TLS verification entirely (last resort)")
     p_setup.add_argument("--scan-timeout", type=float, help="Custom duration for local printer network scanning")
+    p_setup.add_argument("--migrate-access-code", action="store_true", help="Move inline access_code into access_code_file and update config.json")
 
     return parser
 
@@ -362,6 +363,7 @@ def _json_setup_should_be_noninteractive(args):
     return (
         args.cmd == "setup"
         and bool(getattr(args, "json", False))
+        and not _namespace_get(args, "migrate_access_code", False)
         and not _setup_args_provided(args)
         and not sys.stdin.isatty()
     )
@@ -371,6 +373,14 @@ def _setup_args_provided(args):
         _namespace_get(args, attr) is not None
         for attr in ("printer_ip", "serial", "access_code", "access_code_env", "access_code_file", "model", "nozzle")
     )
+
+def _resolve_command(name):
+    """Look up the cmd_* handler for a command through bambu_cli.bambu so
+    tests that patch bambu.cmd_* (or bambu.cmd_job) still take effect."""
+    func_name = "cmd_job" if name in ("job", "send") else f"cmd_{name}"
+    from bambu_cli import bambu
+    return getattr(bambu, func_name, None)
+
 
 def main():
     from bambu_cli import bambu
@@ -432,9 +442,10 @@ def main():
             emit_json_error(args, args.cmd or "main", EXIT_CONFIG_ERROR, message, failed_step="config")
             sys.exit(EXIT_CONFIG_ERROR)
 
-    if args.cmd in bambu._cmds:
+    _handler = _resolve_command(args.cmd)
+    if _handler is not None:
         try:
-            bambu._cmds[args.cmd](args)
+            _handler(args)
         except SystemExit as exc:
             exit_code = _exit_code_from_system_exit(exc)
             if exit_code != EXIT_SUCCESS and _json_mode_requested(args) and not utils._JSON_EMITTED:

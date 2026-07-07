@@ -210,7 +210,7 @@ You can also run `setup` with no flags for guided discovery and prompts:
 bambu-cli setup
 ```
 
-Guided setup defaults to storing the access code in a separate `access_code` file next to `config.json`, rather than embedding the secret directly in JSON. You can opt out during the prompt if you specifically want inline config.
+Guided setup defaults to storing the access code in a separate `access_code` file next to `config.json`, rather than embedding the secret directly in JSON. You can opt out during the prompt if you specifically want inline config, but note that inline `access_code` is **deprecated** and will be removed in a future release; run `bambu setup --migrate-access-code` to move an existing inline value into a file.
 `setup --json` emits one machine-readable setup result on stdout. It reports paths and configured-state booleans but does not echo the printer serial or access code. Path fields under the current home directory are compacted to `~` in agent-facing JSON, including setup error payloads.
 When `setup --json` is run without setup values from a non-interactive stdin, it returns a structured missing-values error instead of prompting or printing a traceback.
 If non-interactive setup is given an existing `--access-code-file` without a new `--access-code-env`/`--access-code` value, it reads that file first and rejects empty or placeholder contents before writing config.
@@ -429,8 +429,8 @@ docker run -d --name bambu_camera -p 1985:1984 \
 |-----|----------|---------|-------------|
 | `printer_ip` | ✅ | — | Printer's LAN IP address |
 | `serial` | ✅ | — | Printer serial number |
-| `access_code` | ✅* | — | Printer access code (or use `access_code_file`) |
-| `access_code_file` | ✅* | — | Path to file containing access code |
+| `access_code` | ✅* | — | Printer access code (or use `access_code_file`). **Deprecated** — migrate with `bambu setup --migrate-access-code`; support will be removed in a future release. |
+| `access_code_file` | ✅* | — | Path to file containing access code (recommended) |
 | `mqtt_port` | | 8883 | MQTT TLS port |
 | `cert_fingerprint` | | — | SHA-256 of the printer's self-signed cert. Pins FTPS + MQTT to that exact cert. Run `doctor` to print the value to copy. Recommended over `insecure_tls`. |
 | `insecure_tls` | | false | Disable TLS certificate verification entirely (last resort if pinning isn't viable) |

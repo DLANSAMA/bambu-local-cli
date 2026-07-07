@@ -29,10 +29,12 @@ installs on macOS/Windows keep working.
 This module is the CLI entry point and the shared runtime-state namespace.
 Command logic lives in the sibling modules (cli, commands, download, job,
 setup_cmd, camera, slicer, config, printer, protocols); every public and
-private helper is re-exported here so ``from bambu_cli import bambu`` remains
-a stable facade for tests and scripts, and so runtime state can be patched in
-one place (``bambu.SIMULATION_MODE``, ``bambu.PRINTER_IP``, ...).
+private helper is reachable through this module via a lazy ``__getattr__``
+forwarder, so ``from bambu_cli import bambu`` remains a stable facade for
+tests and scripts, and so runtime state can be patched in one place
+(``bambu.SIMULATION_MODE``, ``bambu.PRINTER_IP``, ...).
 """
+import importlib
 import logging
 import sys
 
@@ -77,192 +79,31 @@ def _redacted_serial():
 
 
 # --- Facade ------------------------------------------------------------------
-# Bind every public name from the implementation modules into this namespace.
-from bambu_cli.constants import *
-from bambu_cli.cli import *
-from bambu_cli.config import *
-from bambu_cli.slicer import *
-from bambu_cli.download import *
-from bambu_cli.job import *
-from bambu_cli.setup_cmd import *
-from bambu_cli.camera import *
-from bambu_cli.commands import *
-from bambu_cli.protocols.ftps import *
-from bambu_cli.protocols.mqtt import *
+# `main` is pinned as a real import so `python -m bambu_cli.bambu` and the
+# `bambu-cli` console-script entry point (bambu_cli.bambu:main) keep working
+# without going through __getattr__.
+from bambu_cli.cli import main
 
-# Restore the real logger in bambu.py namespace so it is not overridden by the submodule proxies
-logger = logging.getLogger("bambu")
-
-# Private helpers also exposed under the bambu namespace for tests and cross-module use
-from bambu_cli.utils import (
-    _ensure_output_dir,
-    _ensure_parent_dir,
-    _secure_makedirs,
+_FACADE_MODULES = (
+    "bambu_cli.constants", "bambu_cli.cli", "bambu_cli.config",
+    "bambu_cli.slicer", "bambu_cli.download", "bambu_cli.job",
+    "bambu_cli.setup_cmd", "bambu_cli.camera", "bambu_cli.commands",
+    "bambu_cli.utils", "bambu_cli.errors", "bambu_cli.context",
+    "bambu_cli.printer", "bambu_cli.protocols.ftps", "bambu_cli.protocols.mqtt",
 )
-from bambu_cli.cli import (
-    _namespace_get,
-    _display_path,
-    _expand_path,
-    _path_for_message,
-    _exception_for_message,
-    _exit_code_from_system_exit,
-    _redact_url_credentials,
-    _looks_like_schemeless_credential_url,
-    _json_mode_requested,
-    _add_job_arguments,
-    _argv_json_requested,
-    _guess_command_from_argv,
-    _requires_printer_dns_check,
-    _json_setup_should_be_noninteractive,
-    _setup_args_provided,
-)
-from bambu_cli.slicer import (
-    _is_directory_input,
-    _directory_input_message,
-    _validate_slice_options,
-    _sliced_output_path,
-    _slicer_executable_problem,
-    _convert_step_to_stl,
-    _process_profile_compatible,
-    _discover_process_profile,
-    _create_temp_profiles,
-    _safe_temp_prefix,
-    _normalize_wall_type,
-)
-from bambu_cli.download import (
-    _cmd_download,
-    _default_user_agent,
-    _download_filename_with_extension,
-    _download_source_extension,
-    _download_target_filename,
-    _extract_zip_model,
-    _file_extension,
-    _filename_from_content_disposition,
-    _get_printables_download_link,
-    _get_printables_file_info,
-    _is_archive_download,
-    _is_html_content_type,
-    _is_http_url,
-    _is_print_ready_name,
-    _is_printables_model_url,
-    _is_zip_content_type,
-    _known_unsupported_content_type,
-    _known_unsupported_download_extension,
-    _looks_like_url,
-    _max_download_mb_error,
-    _ModelLinkParser,
-    _name_for_message,
-    _normalize_url_input,
-    _portable_basename,
-    _print_ready_error_message,
-    _reject_non_print_ready,
-    _reject_oversized_download,
-    _reject_unsupported_content_type,
-    _reject_unsupported_download_extension,
-    _resolve_html_model_link,
-    _response_header,
-    _response_url,
-    _safe_remote_name,
-    _sanitize_download_filename,
-    _select_printables_file,
-    _select_zip_model_member,
-    _unsupported_download_message,
-    _validate_download_url_or_exit,
-    _validate_http_url_or_exit,
-    _validate_max_download_mb_or_exit,
-)
-from bambu_cli.job import (
-    _cmd_job,
-    _emit_job_failure,
-    _job_fail,
-    _last_error_for,
-    _parse_print_options,
-    _predicted_sliced_remote_name,
-    _predicted_url_download_extension,
-    _predicted_url_remote_name,
-    _prepare_job_output_dir,
-    _print_next_command,
-    _slice_args_for_job,
-    _validate_predicted_remote_name_or_fail,
-)
-from bambu_cli.setup_cmd import (
-    _build_setup_config,
-    _cmd_preflight,
-    _cmd_setup,
-    _cmd_setup_noninteractive,
-    _default_access_code_file_path,
-    _file_permission_check,
-    _looks_like_placeholder,
-    _module_available,
-    _normalize_model,
-    _normalize_nozzle,
-    _parse_mdns_printer_identity,
-    _preflight_result,
-    _prompt_access_code_file_path,
-    _prompt_secret,
-    _prompt_text,
-    _secure_write_json,
-    _secure_write_text,
-    _service_info_address,
-    _setup_file_error,
-    _setup_json_error,
-    _setup_path_details,
-    _setup_summary,
-    _validate_setup_access_code_file,
-    _write_setup_config,
-)
-from bambu_cli.camera import (
-    _cmd_snapshot,
-    _grab_camera_frame_direct,
-    _write_snapshot_atomic,
-)
-from bambu_cli.config import (
-    _expected_fingerprint,
-    _first_existing_path,
-    _default_orca_path,
-    _default_profiles_path,
-    _DEFAULT_ORCA,
-    _DEFAULT_PROFILES,
-    _access_code_value_problem,
-    get_network_timeout,
-    get_slicer_timeout,
-    get_command_timeout,
-    get_upload_timeout,
-)
-from bambu_cli.protocols.ftps import (
-    _verify_cert_fingerprint,
-    _noncolliding_path,
-    _SIM_FTP_FILES,
-    _remove_partial_file,
-    _download_partial_path,
-)
-from bambu_cli.protocols.mqtt import (
-    _require_mqtt,
-    _resolve_ip,
-    _mqtt_connect,
-    _get_and_verify_cert_pem,
-    _SimMqttClient,
-)
-from bambu_cli.errors import *
-from bambu_cli.context import Settings, RuntimeContext, get_current
-
-class DynamicCmds(dict):
-    """Resolve command handlers through this module so tests can patch cmd_*."""
-
-    def __contains__(self, key):
-        from bambu_cli import bambu
-        func_name = "cmd_job" if key in ("job", "send") else f"cmd_{key}"
-        return hasattr(bambu, func_name)
-
-    def __getitem__(self, key):
-        from bambu_cli import bambu
-        func_name = "cmd_job" if key in ("job", "send") else f"cmd_{key}"
-        if hasattr(bambu, func_name):
-            return getattr(bambu, func_name)
-        raise KeyError(key)
 
 
-_cmds = DynamicCmds()
+def __getattr__(name):
+    """Lazily resolve any public or private helper from the implementation
+    modules, so ``bambu_cli.bambu`` remains a stable facade (``bambu.<name>``)
+    for tests and scripts without eagerly importing (or re-listing) every
+    submodule symbol here."""
+    for _mod_name in _FACADE_MODULES:
+        mod = importlib.import_module(_mod_name)
+        if hasattr(mod, name):
+            return getattr(mod, name)
+    raise AttributeError(f"module 'bambu_cli.bambu' has no attribute {name!r}")
+
 
 if __name__ == "__main__":
     main()
