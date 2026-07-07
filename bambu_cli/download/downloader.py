@@ -1,497 +1,54 @@
-"""Model download pipeline: SSRF-safe HTTP, URL/filename validation, ZIP
-extraction, HTML link scraping, and Printables GraphQL resolution."""
-import email.message
-import email.utils
+"""The `download` command: HTTP fetch loop, redirects, HTML resolution, limits."""
 import os
-import re
-import socket  # noqa: F401 -- re-exported for test compat (download.socket patching)
 import sys
 import tempfile
 import urllib.error
 import urllib.request
-import zipfile
-from html.parser import HTMLParser
-from urllib.parse import unquote, urljoin, urlparse
+from urllib.parse import urlparse
 
 from bambu_cli.cli import (
     _exception_for_message,
     _exit_code_from_system_exit,
     _expand_path,
-    _looks_like_schemeless_credential_url,
     _namespace_get,
     _path_for_message,
     _redact_url_credentials,
 )
 from bambu_cli.constants import (
-    ARCHIVE_DOWNLOAD_EXTENSIONS,
-    DEFAULT_MAX_DOWNLOAD_MB,
-    DOWNLOAD_CANDIDATE_EXTENSIONS,
-    DOWNLOAD_LINK_EXTENSION_PRIORITY,
     DOWNLOAD_TIMEOUT,
-    DOWNLOADABLE_EXTENSIONS,
     EXIT_COMMAND_ERROR,
     EXIT_FILE_ERROR,
     EXIT_NETWORK_ERROR,
     HTML_LINK_SCAN_LIMIT,
-    KNOWN_UNSUPPORTED_CONTENT_TYPES,
-    KNOWN_UNSUPPORTED_DOWNLOAD_EXTENSIONS,
-    MAX_DOWNLOAD_FILENAME_LENGTH,
-    PRINT_READY_EXTENSIONS,
-    WINDOWS_RESERVED_FILENAMES,
+)
+from bambu_cli.download.extract import _extract_zip_model, _is_archive_download
+from bambu_cli.download.html_links import _is_html_content_type, _resolve_html_model_link
+from bambu_cli.download.naming import (
+    _download_filename_with_extension,
+    _download_target_filename,
+    _filename_from_content_disposition,
+    _portable_basename,
+    _sanitize_download_filename,
+)
+from bambu_cli.download.validation import (
+    _known_unsupported_download_extension,
+    _normalize_url_input,
+    _reject_oversized_download,
+    _reject_unsupported_content_type,
+    _reject_unsupported_download_extension,
+    _validate_download_url_or_exit,
+    _validate_max_download_mb_or_exit,
 )
 from bambu_cli.logging_utils import logger
-
-# MAX_DOWNLOAD_REDIRECT_HOPS, _dns_cache, _get_safe_connection, and the Safe*
-# handler classes below are not used directly in this module; they are
-# re-exported so existing tests that patch/inspect them via
-# ``bambu_cli.download.<name>`` keep working after the SSRF-safety layer
-# moved to netsafety.py.
-from bambu_cli.netsafety import (  # noqa: F401
-    MAX_DOWNLOAD_REDIRECT_HOPS,
-    SafeHTTPHandler,
-    SafeHTTPRedirectHandler,
-    SafeHTTPSHandler,
-    _default_user_agent,
-    _dns_cache,
-    _get_safe_connection,
-    build_safe_opener,
-)
-from bambu_cli.printables import (
-    _is_printables_model_url,
-    resolve_printables_url,
-)
-from bambu_cli.protocols.ftps import (
-    _download_partial_path,
-    _noncolliding_path,
-    _remove_partial_file,
-)
-from bambu_cli.utils import (
-    _ensure_output_dir,
-    _record_download_success,
-    emit_json_error,
-)
-
-
-def _looks_like_url(value):
-    parsed = urlparse(value)
-    return bool(parsed.scheme and "://" in value)
-
-
-def _normalize_url_input(value):
-    """Accept common scheme-less website inputs without mistaking model.stl for a URL."""
-    if _looks_like_url(value):
-        return value
-    if value.startswith(("/", ".", "~", "$")) or os.path.exists(_expand_path(value)):
-        return value
-    if _looks_like_schemeless_credential_url(value):
-        return f"https://{value}"
-
-    # Agents and users often omit https:// for web pages. Require either a
-    # www. host or a domain/path form so missing local files like model.stl stay
-    # local paths and get the normal "File not found" error.
-    if value.startswith("www.") or re.match(r"^[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?::\d+)?/", value):
-        return f"https://{value}"
-    return value
-
-
-def _is_http_url(value):
-    parsed = urlparse(value)
-    return parsed.scheme.lower() in ("http", "https") and bool(parsed.netloc)
-
-
-def _validate_http_url_or_exit(value):
-    parsed = urlparse(value)
-    if parsed.scheme.lower() not in ("http", "https"):
-        logger.error(f"Invalid URL scheme: {parsed.scheme or 'none'}")
-        sys.exit(EXIT_COMMAND_ERROR)
-    if not parsed.netloc:
-        logger.error("Invalid URL: missing host")
-        sys.exit(EXIT_COMMAND_ERROR)
-    if parsed.username is not None or parsed.password is not None:
-        logger.error("Invalid URL: embedded credentials are not supported")
-        sys.exit(EXIT_COMMAND_ERROR)
-
-
-def _validate_download_url_or_exit(args, source_url, normalized_source, url, failed_step, label):
-    """Validate a download URL and emit structured, redacted JSON on failure."""
-    try:
-        _validate_http_url_or_exit(url)
-    except SystemExit as exc:
-        emit_json_error(
-            args,
-            "download",
-            _exit_code_from_system_exit(exc),
-            f"{label}: {_redact_url_credentials(url)}",
-            failed_step=failed_step,
-            source=_redact_url_credentials(source_url),
-            normalized_source=_redact_url_credentials(normalized_source),
-            download_url=_redact_url_credentials(url),
-        )
-        raise
-
-
-def _name_for_message(value):
-    """Return a local/remote name for messages without URL credentials."""
-    return _redact_url_credentials(value)
-
-
-def _file_extension(path):
-    return os.path.splitext(path)[1].lower()
-
-
-def _portable_basename(path):
-    """Return a basename while treating both POSIX and Windows separators as separators."""
-    return os.path.basename(str(path or "").replace("\\", "/"))
-
-
-def _download_source_extension(url, fallback_name=None):
-    """Infer the model/print extension from a URL path or resolved filename."""
-    for value in (fallback_name, unquote(urlparse(url).path)):
-        ext = _file_extension(value or "")
-        if ext in DOWNLOADABLE_EXTENSIONS + ARCHIVE_DOWNLOAD_EXTENSIONS:
-            return ext
-    return ".stl"
-
-
-def _download_filename_with_extension(filename, url, fallback_name=None):
-    source_ext = _download_source_extension(url, fallback_name=fallback_name)
-    stem, ext = os.path.splitext(filename)
-    if ext.lower() in DOWNLOADABLE_EXTENSIONS + ARCHIVE_DOWNLOAD_EXTENSIONS:
-        if ext.lower() != source_ext:
-            return f"{stem}{source_ext}"
-        return filename
-    return filename + source_ext
-
-
-def _download_target_filename(args, url, resolved_name=None):
-    """Choose a safe local filename for a direct model/print download."""
-    if _namespace_get(args, "name"):
-        filename = _sanitize_download_filename(_namespace_get(args, "name"))
-    elif resolved_name:
-        filename = _sanitize_download_filename(resolved_name)
-    else:
-        path = urlparse(url).path
-        filename = _sanitize_download_filename(_portable_basename(unquote(path)) or "model.stl")
-    return _download_filename_with_extension(filename, url, fallback_name=resolved_name)
-
-
-def _known_unsupported_download_extension(value):
-    """Return a clearly unsupported source extension, or None when ambiguous."""
-    ext = _file_extension(_portable_basename(unquote(str(value or ""))))
-    if ext and ext not in DOWNLOADABLE_EXTENSIONS and ext in KNOWN_UNSUPPORTED_DOWNLOAD_EXTENSIONS:
-        return ext
-    return None
-
-
-def _unsupported_download_message(ext):
-    supported = ", ".join(DOWNLOADABLE_EXTENSIONS + ARCHIVE_DOWNLOAD_EXTENSIONS)
-    return (
-        f"Unsupported download file type '{ext}'. Supported types: {supported}. "
-        "Use a direct model/print file, a ZIP containing a model/print file, a Printables model page, or a page with a direct model-file link."
-    )
-
-
-def _reject_unsupported_download_extension(args, source_url, normalized_source, url, value, failed_step="validate"):
-    ext = _known_unsupported_download_extension(value)
-    if not ext:
-        return
-    message = _unsupported_download_message(ext)
-    logger.error(message)
-    emit_json_error(
-        args,
-        "download",
-        EXIT_FILE_ERROR,
-        message,
-        failed_step=failed_step,
-        source=_redact_url_credentials(source_url),
-        normalized_source=_redact_url_credentials(normalized_source),
-        download_url=_redact_url_credentials(url),
-        extension=ext,
-    )
-    sys.exit(EXIT_FILE_ERROR)
-
-
-def _known_unsupported_content_type(content_type):
-    """Return a clearly unsupported response content type, or None when ambiguous."""
-    media_type = (content_type or "").split(";", 1)[0].strip().lower()
-    if not media_type:
-        return None
-    if media_type.startswith("image/"):
-        return media_type
-    if media_type in KNOWN_UNSUPPORTED_CONTENT_TYPES:
-        return media_type
-    return None
-
-
-def _reject_unsupported_content_type(args, source_url, normalized_source, url, content_type):
-    media_type = _known_unsupported_content_type(content_type)
-    if not media_type:
-        return
-    message = f"Download URL returned unsupported content type '{media_type}', not a model file."
-    logger.error(message)
-    emit_json_error(
-        args,
-        "download",
-        EXIT_FILE_ERROR,
-        message,
-        failed_step="download",
-        source=_redact_url_credentials(source_url),
-        normalized_source=_redact_url_credentials(normalized_source),
-        download_url=_redact_url_credentials(url),
-        content_type=media_type,
-    )
-    sys.exit(EXIT_FILE_ERROR)
-
-
-def _max_download_mb_error(args):
-    max_download_mb = _namespace_get(args, "max_download_mb", DEFAULT_MAX_DOWNLOAD_MB)
-    try:
-        max_download_mb = int(max_download_mb)
-    except (TypeError, ValueError):
-        max_download_mb = 0
-    if max_download_mb <= 0:
-        return "--max-download-mb must be a positive integer"
-    return None
-
-
-def _validate_max_download_mb_or_exit(args, command="download"):
-    message = _max_download_mb_error(args)
-    if message:
-        logger.error(message)
-        emit_json_error(args, command, EXIT_COMMAND_ERROR, message, failed_step="validate")
-        sys.exit(EXIT_COMMAND_ERROR)
-    max_download_mb = int(_namespace_get(args, "max_download_mb", DEFAULT_MAX_DOWNLOAD_MB))
-    return max_download_mb * 1024 * 1024
-
-
-def _reject_oversized_download(args, source_url, normalized_source, url, outpath, received_bytes, max_bytes, content_length=None):
-    limit_mb = max_bytes // (1024 * 1024)
-    if content_length is not None:
-        message = f"Download is too large: {content_length} bytes exceeds the {limit_mb} MB safety limit."
-    else:
-        message = f"Download exceeded the {limit_mb} MB safety limit."
-    logger.error(message)
-    emit_json_error(
-        args,
-        "download",
-        EXIT_FILE_ERROR,
-        message,
-        failed_step="download",
-        source=_redact_url_credentials(source_url),
-        normalized_source=_redact_url_credentials(normalized_source),
-        download_url=_redact_url_credentials(url),
-        path=outpath,
-        received_bytes=received_bytes,
-        content_length=content_length,
-        max_download_bytes=max_bytes,
-    )
-    sys.exit(EXIT_FILE_ERROR)
-
-
-def _archive_member_too_large_message(filename, member_bytes, max_bytes):
-    limit_mb = max_bytes // (1024 * 1024)
-    return f"ZIP member is too large: {filename} is {member_bytes} bytes and exceeds the {limit_mb} MB safety limit."
-
-
-def _archive_member_exceeded_limit_message(filename, max_bytes):
-    limit_mb = max_bytes // (1024 * 1024)
-    return f"ZIP member exceeded the {limit_mb} MB safety limit while extracting: {filename}"
-
-
-def _is_html_content_type(content_type):
-    return (content_type or "").split(";", 1)[0].strip().lower() in ("text/html", "application/xhtml+xml")
-
-
-def _is_zip_content_type(content_type):
-    media_type = (content_type or "").split(";", 1)[0].strip().lower()
-    return media_type in ("application/zip", "application/x-zip-compressed")
-
-
-def _is_archive_download(url, filename=None, content_type=None):
-    values = [filename, unquote(urlparse(url).path)]
-    return (
-        any(_file_extension(_portable_basename(value or "")) in ARCHIVE_DOWNLOAD_EXTENSIONS for value in values)
-        or _is_zip_content_type(content_type)
-    )
-
-
-def _select_zip_model_member(archive):
-    """Pick the best supported model/print file from a ZIP without trusting paths."""
-    candidates = []
-    for index, info in enumerate(archive.infolist()):
-        if info.is_dir() or info.file_size <= 0:
-            continue
-        mode = (info.external_attr >> 16) & 0o170000
-        if mode == 0o120000:  # Symlink entries are not model files.
-            continue
-        filename = _sanitize_download_filename(_portable_basename(info.filename))
-        ext = _file_extension(filename)
-        if ext in DOWNLOADABLE_EXTENSIONS:
-            candidates.append((DOWNLOAD_LINK_EXTENSION_PRIORITY.get(ext, 99), index, info, filename))
-    if not candidates:
-        return None, None
-    _, _, info, filename = min(candidates)
-    return info, filename
-
-
-def _extract_zip_model(zip_path, outdir, args):
-    """Extract exactly one supported model/print file from a downloaded ZIP."""
-    try:
-        with zipfile.ZipFile(zip_path) as archive:
-            info, member_filename = _select_zip_model_member(archive)
-            if info is None:
-                raise ValueError("ZIP archive did not contain a supported model or printer-ready file.")
-            max_bytes = int(_namespace_get(args, "max_download_mb", DEFAULT_MAX_DOWNLOAD_MB)) * 1024 * 1024
-            if info.file_size > max_bytes:
-                raise ValueError(_archive_member_too_large_message(member_filename, info.file_size, max_bytes))
-            if _namespace_get(args, "name"):
-                filename = _download_filename_with_extension(
-                    _sanitize_download_filename(_namespace_get(args, "name")),
-                    member_filename,
-                    fallback_name=member_filename,
-                )
-            else:
-                filename = member_filename
-            outpath = os.path.join(outdir, filename)
-            outpath = _noncolliding_path(outpath)
-            filename = _portable_basename(outpath)
-            partial_path, replace_on_success = _download_partial_path(outpath)
-            try:
-                with archive.open(info, "r") as src, open(partial_path, "wb") as dst:
-                    extracted = 0
-                    while True:
-                        chunk = src.read(65536)
-                        if not chunk:
-                            break
-                        extracted += len(chunk)
-                        if extracted > max_bytes:
-                            raise ValueError(_archive_member_exceeded_limit_message(member_filename, max_bytes))
-                        dst.write(chunk)
-            except Exception:
-                _remove_partial_file(partial_path)
-                raise
-            size = os.path.getsize(partial_path)
-            if size <= 0:
-                _remove_partial_file(partial_path)
-                raise ValueError(f"ZIP member is empty: {member_filename}")
-            if replace_on_success:
-                os.replace(partial_path, outpath)
-            logger.info(f"📦 Extracted from ZIP: {member_filename} → {_path_for_message(outpath)} ({size // 1024}KB)")
-            return outpath, filename, member_filename, size
-    except zipfile.BadZipFile as exc:
-        raise ValueError("Downloaded ZIP archive is invalid or corrupt.") from exc
-
-
-class _ModelLinkParser(HTMLParser):
-    """Extract direct model/print links from simple HTML pages."""
-
-    LINK_ATTRS = (
-        "href", "src", "data-url", "data-href", "data-download-url",
-        "data-file-url", "data-src",
-    )
-    FILENAME_HINT_ATTRS = (
-        "download", "filename", "data-filename", "data-file-name", "data-name",
-    )
-
-    def __init__(self, base_url):
-        super().__init__(convert_charrefs=True)
-        self.base_url = base_url
-        self.candidates = []
-
-    def handle_starttag(self, tag, attrs):
-        attrs_by_name = {name.lower(): value for name, value in attrs}
-        filename_hint = self._filename_hint(attrs_by_name)
-        for name in self.LINK_ATTRS:
-            self._add_candidate(attrs_by_name.get(name), filename_hint=filename_hint)
-
-    def handle_startendtag(self, tag, attrs):
-        self.handle_starttag(tag, attrs)
-
-    def _filename_hint(self, attrs_by_name):
-        for name in self.FILENAME_HINT_ATTRS:
-            value = attrs_by_name.get(name)
-            if not value:
-                continue
-            filename = _portable_basename(unquote(str(value).strip()))
-            if _file_extension(filename) in DOWNLOAD_CANDIDATE_EXTENSIONS:
-                return filename
-        return None
-
-    def _add_candidate(self, value, filename_hint=None):
-        if not value:
-            return
-        value = value.strip()
-        if not value or value.startswith(("#", "javascript:", "mailto:", "data:")):
-            return
-        absolute = urljoin(self.base_url, value)
-        parsed = urlparse(absolute)
-        if parsed.scheme.lower() not in ("http", "https") or not parsed.netloc:
-            return
-        name = _portable_basename(unquote(parsed.path))
-        ext = _file_extension(name)
-        if ext not in DOWNLOAD_CANDIDATE_EXTENSIONS and filename_hint:
-            name = filename_hint
-            ext = _file_extension(name)
-        if ext in DOWNLOAD_CANDIDATE_EXTENSIONS:
-            self.candidates.append((absolute, name, ext))
-
-
-def _resolve_html_model_link(page_bytes, base_url):
-    """Return the best direct model/print link found on a generic HTML page."""
-    if not page_bytes:
-        return None, None
-    parser = _ModelLinkParser(base_url)
-    try:
-        parser.feed(page_bytes[:HTML_LINK_SCAN_LIMIT].decode("utf-8", errors="replace"))
-    except Exception:
-        return None, None
-
-    seen = set()
-    candidates = []
-    for index, candidate in enumerate(parser.candidates):
-        url, name, ext = candidate
-        candidate_key = (url, name)
-        if candidate_key in seen:
-            continue
-        seen.add(candidate_key)
-        candidates.append((DOWNLOAD_LINK_EXTENSION_PRIORITY.get(ext, 99), index, url, name))
-    if not candidates:
-        return None, None
-    _, _, url, name = min(candidates)
-    return url, name
-
-
-def _sanitize_download_filename(filename):
-    filename = _portable_basename(filename)
-    filename = re.sub(r'[\x00-\x1f<>:"/\\|?*]', "_", filename).strip(" .")
-    if filename in ('.', '..') or not filename:
-        return "model.stl"
-    stem, ext = os.path.splitext(filename)
-    if stem.upper() in WINDOWS_RESERVED_FILENAMES:
-        filename = f"_{filename}"
-        stem, ext = os.path.splitext(filename)
-    if len(filename) > MAX_DOWNLOAD_FILENAME_LENGTH:
-        stem_limit = max(1, MAX_DOWNLOAD_FILENAME_LENGTH - len(ext))
-        filename = f"{stem[:stem_limit]}{ext}"
-    return filename
-
-
-def _filename_from_content_disposition(value):
-    if not value:
-        return None
-    message = email.message.Message()
-    message["content-disposition"] = value
-    filename = None
-    # RFC 5987/RFC 2231 filename* values carry the better decoded filename.
-    # email.message normalizes them as duplicate "filename" tuple params; when
-    # both filename and filename* exist, prefer the tuple value.
-    for key, param_value in reversed(message.get_params(header="content-disposition") or []):
-        if key.lower() == "filename" and isinstance(param_value, tuple):
-            filename = email.utils.collapse_rfc2231_value(param_value)
-            break
-    if filename is None:
-        filename = message.get_filename()
-    return _sanitize_download_filename(filename) if filename else None
+from bambu_cli.netsafety import _default_user_agent
+from bambu_cli.printables import _is_printables_model_url
+from bambu_cli.protocols.ftps import _download_partial_path, _remove_partial_file
+from bambu_cli.utils import _ensure_output_dir, _record_download_success, emit_json_error
+
+# build_safe_opener, resolve_printables_url, and _noncolliding_path are called
+# through the package namespace (not bound here) so existing test patches on
+# ``bambu_cli.download.<name>`` keep working after the package split.
+from bambu_cli import download as _download_pkg  # isort: skip
 
 
 def _response_header(resp, name):
@@ -509,49 +66,6 @@ def _response_url(resp):
     except Exception:
         return None
     return value if isinstance(value, str) and value else None
-
-
-def _safe_remote_name(filename):
-    """Reject names that are unsafe for printer-side files.
-
-    FTP commands are CRLF-delimited, so a NUL/CR/LF in a filename bound into a
-    ``STOR``/``DELE`` line could smuggle a second command. ``os.path.basename``
-    strips path separators but not these, so we reject them explicitly. Also
-    reject Windows/FAT-hostile characters and reserved names because printer SD
-    storage and cross-platform agent workflows should use portable filenames.
-    Returns the name unchanged if safe, else ``None``.
-    """
-    if not filename or filename in ('.', '..'):
-        return None
-    if filename != _portable_basename(filename):
-        return None
-    if any(c in filename for c in ('\r', '\n', '\0')):
-        return None
-    if any(c in filename for c in '<>:"/\\|?*'):
-        return None
-    if filename != filename.strip(" ."):
-        return None
-    if len(filename) > MAX_DOWNLOAD_FILENAME_LENGTH:
-        return None
-    stem, _ = os.path.splitext(filename)
-    if stem.upper() in WINDOWS_RESERVED_FILENAMES:
-        return None
-    return filename
-
-
-def _is_print_ready_name(filename):
-    return _file_extension(filename) in PRINT_READY_EXTENSIONS
-
-
-def _reject_non_print_ready(filename, action):
-    if not _is_print_ready_name(filename):
-        logger.error(_print_ready_error_message(filename, action))
-        sys.exit(EXIT_FILE_ERROR)
-
-
-def _print_ready_error_message(filename, action):
-    supported = ", ".join(PRINT_READY_EXTENSIONS)
-    return f"Cannot {action} '{filename}': expected a printer-ready file ({supported}). Use `job` or `slice` for model files."
 
 
 def _cmd_download(args):
@@ -592,7 +106,7 @@ def _cmd_download(args):
         'Accept': '*/*',
     }
 
-    resolved_url, stl_name = resolve_printables_url(url)
+    resolved_url, stl_name = _download_pkg.resolve_printables_url(url)
 
     # If the URL was a Printables page, it may have been resolved successfully.
     # If it was a Printables page and failed, we should return to match original behavior.
@@ -616,7 +130,7 @@ def _cmd_download(args):
     partial_path = None
     replace_on_success = False
     outpath = None
-    safe_opener = build_safe_opener()
+    safe_opener = _download_pkg.build_safe_opener()
     try:
         for _html_resolution_attempt in range(3):
             archive_download = _is_archive_download(url, stl_name)
@@ -631,7 +145,7 @@ def _cmd_download(args):
             else:
                 filename = _download_target_filename(args, url, stl_name)
                 outpath = os.path.join(outdir, filename)
-                outpath = _noncolliding_path(outpath)
+                outpath = _download_pkg._noncolliding_path(outpath)
                 filename = _portable_basename(outpath)
             req = urllib.request.Request(url, headers=headers)
             with safe_opener.open(req, timeout=DOWNLOAD_TIMEOUT) as resp:
@@ -659,7 +173,7 @@ def _cmd_download(args):
                     if not stl_name and not _namespace_get(args, "name") and not archive_download:
                         filename = _download_target_filename(args, url, stl_name)
                         outpath = os.path.join(outdir, filename)
-                        outpath = _noncolliding_path(outpath)
+                        outpath = _download_pkg._noncolliding_path(outpath)
                         filename = _portable_basename(outpath)
                 content_type = _response_header(resp, 'Content-Type')
                 archive_download = archive_download or _is_archive_download(url, stl_name, content_type)
@@ -735,7 +249,7 @@ def _cmd_download(args):
                         else:
                             filename = _download_filename_with_extension(header_filename, url, fallback_name=header_filename)
                         outpath = os.path.join(outdir, filename)
-                        outpath = _noncolliding_path(outpath)
+                        outpath = _download_pkg._noncolliding_path(outpath)
                         filename = _portable_basename(outpath)
 
                 logger.info(f"⬇️  Downloading {filename}...")
