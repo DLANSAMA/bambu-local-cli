@@ -53,3 +53,32 @@ packages = ["bambu_cli", "bambu_cli.protocols"]
 
 [tool.setuptools.package-data]
 "bambu_cli" = ["README.md", "AGENTS.md", "requirements.txt"]
+
+[tool.ruff]
+target-version = "py39"
+line-length = 120
+extend-exclude = ["docs", "scripts"]
+
+[tool.ruff.lint]
+# Start conservative: correctness-focused rules only. Style rules can be
+# enabled once the codebase is formatted.
+select = ["E9", "F", "B", "PLE"]
+ignore = [
+    "F403", # star imports: bambu.py facade uses them deliberately (P1 cleanup)
+    "F405", # names from star imports
+]
+
+[tool.ruff.lint.per-file-ignores]
+# The facade re-imports every helper so tests/agents can reach them via
+# `bambu.<name>`; each one is "unused" by definition.
+"bambu_cli/bambu.py" = ["F401"]
+# MQTT callbacks close over per-iteration loop variables deliberately; each
+# callback's lifetime ends with its iteration.
+"bambu_cli/protocols/mqtt.py" = ["B023"]
+
+[tool.bandit]
+exclude_dirs = ["tests", ".claude", "scripts"]
+# B101 assert; B310 urllib urlopen (custom safe opener handles validation);
+# B104 "0.0.0.0" is the unconfigured-printer-IP sentinel, never a bind address;
+# B402/B321 the printer only speaks FTPS -- that is the tool's purpose.
+skips = ["B101", "B310", "B104", "B402", "B321"]
