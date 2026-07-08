@@ -579,6 +579,34 @@ def _run_orcaslicer(  # pragma: no cover -- external process + rich TTY UI; cmd_
     )
 
 
+def _is_valid_sliced_3mf(path: str) -> bool:
+    """Return True if *path* is a non-corrupt 3MF zip with expected members.
+
+    A sliced Bambu/Orca .3mf is an OPC zip package. We require:
+    - openable as a zip archive with no CRC errors (``testzip()`` is None)
+    - ``[Content_Types].xml`` (OPC package marker)
+    - either ``3D/3dmodel.model`` (core 3MF model) or a ``Metadata/plate_*.gcode``
+      plate (what the printer print payload references)
+    """
+    import zipfile
+
+    try:
+        if not zipfile.is_zipfile(path):
+            return False
+        with zipfile.ZipFile(path, "r") as zf:
+            if zf.testzip() is not None:
+                return False
+            names = set(zf.namelist())
+    except (OSError, zipfile.BadZipFile):
+        return False
+
+    if "[Content_Types].xml" not in names:
+        return False
+    has_model = "3D/3dmodel.model" in names
+    has_plate = any(n.startswith("Metadata/plate_") and n.endswith(".gcode") for n in names)
+    return has_model or has_plate
+
+
 def _finalize_slice(  # pragma: no cover -- slicer helper
     result: subprocess.CompletedProcess[str] | None,
     outpath: str,
@@ -593,7 +621,8 @@ def _finalize_slice(  # pragma: no cover -- slicer helper
     from bambu_cli.utils import emit_json, emit_json_error
 
     # OrcaSlicer can exit non-zero on a headless GL/thumbnail step even when the slice
-    # itself succeeded and a valid .3mf was written. Treat that specific case as success.
+    # itself succeeded and a valid .3mf was written. Treat that specific case as success
+    # only when the output is a real, non-corrupt 3MF package (not truncated garbage).
     _benign_rc = False
     if result is not None and result.returncode != 0 and os.path.exists(outpath):
         try:
@@ -603,7 +632,7 @@ def _finalize_slice(  # pragma: no cover -- slicer helper
         _blob = ((result.stdout or "") + (result.stderr or "")).lower()
         _gl_noise = any(k in _blob for k in ("glfw", "glew", "init opengl failed", "skip thumbnail"))
         _real_err = ("nothing to be sliced" in _blob) or ("slicing error" in _blob)
-        _benign_rc = _ok_size and _gl_noise and not _real_err
+        _benign_rc = _ok_size and _gl_noise and not _real_err and _is_valid_sliced_3mf(outpath)
         if _benign_rc:
             logger.warning(
                 "   OrcaSlicer exited non-zero on a headless GL/thumbnail step, but a valid .3mf was produced — continuing."
@@ -627,6 +656,22 @@ def _finalize_slice(  # pragma: no cover -- slicer helper
         if size <= 0:
             bambu._remove_partial_file(outpath)
             message = f"Slicing produced an empty output file: {bambu._path_for_message(outpath)}"
+            logger.error(message)
+            emit_json_error(
+                args,
+                "slice",
+                EXIT_FILE_ERROR,
+                message,
+                failed_step="slicer",
+                file=filepath,
+                output=outpath,
+                bytes=size,
+            )
+            abort("", exit_code=EXIT_FILE_ERROR)
+        # Zero returncode also requires a real 3MF — do not trust size alone.
+        if not _is_valid_sliced_3mf(outpath):
+            bambu._remove_partial_file(outpath)
+            message = f"Slicing produced a corrupt or incomplete .3mf: {bambu._path_for_message(outpath)}"
             logger.error(message)
             emit_json_error(
                 args,

@@ -102,6 +102,19 @@ def _write_profiles(tmpdir):
 # (a) benign GL/thumbnail non-zero exit is treated as success; real errors fail
 # ---------------------------------------------------------------------------
 
+def _write_valid_3mf(path):
+    """Write a minimal non-corrupt Bambu-style .3mf (zip with expected members)."""
+    import zipfile
+
+    with zipfile.ZipFile(path, "w") as zf:
+        zf.writestr(
+            "[Content_Types].xml",
+            '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"></Types>',
+        )
+        zf.writestr("3D/3dmodel.model", '<?xml version="1.0"?><model></model>')
+        zf.writestr("Metadata/plate_1.gcode", "; plate\nG28\n")
+
+
 def test_a_benign_gl_noise_nonzero_is_success():
     """rc=1 with GLFW/skip-thumbnail noise + a valid non-empty .3mf -> returns path."""
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -109,8 +122,8 @@ def test_a_benign_gl_noise_nonzero_is_success():
         with open(infile, "wb") as fh:
             fh.write(b"solid x\nendsolid x\n")
         outpath = slicer._sliced_output_path(infile, tmpdir, 1)
-        with open(outpath, "wb") as fh:  # non-empty fake .3mf "produced" by Orca
-            fh.write(b"PK\x03\x04" + b"\x00" * 4096)
+        _write_valid_3mf(outpath)
+        real_size = os.path.getsize(outpath)
 
         profiles = _write_profiles(tmpdir)
         tmp_proc = types.SimpleNamespace(name=profiles["process.json"])
@@ -128,11 +141,44 @@ def test_a_benign_gl_noise_nonzero_is_success():
              patch.object(slicer, "_create_temp_profiles", return_value=(tmp_proc, tmp_fil)), \
              patch.object(slicer, "_validate_slice_options", return_value=None), \
              patch.object(slicer.os.path, "exists", return_value=True), \
-             patch.object(slicer.os.path, "getsize", return_value=4100), \
+             patch.object(slicer.os.path, "getsize", return_value=real_size), \
              settings_ctx(orca_slicer="/usr/bin/true", profiles_dir=tmpdir):
             result = slicer.cmd_slice(args)
 
         assert result == outpath, "benign GL-noise non-zero exit should be treated as success"
+
+
+def test_a_corrupt_3mf_rejected_despite_benign_gl_noise():
+    """Non-empty but corrupt/truncated .3mf must fail even with GLFW noise present."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        infile = os.path.join(tmpdir, "part.stl")
+        with open(infile, "wb") as fh:
+            fh.write(b"solid x\nendsolid x\n")
+        outpath = slicer._sliced_output_path(infile, tmpdir, 1)
+        # Looks like a zip local-file header but is truncated garbage — not a real 3mf.
+        with open(outpath, "wb") as fh:
+            fh.write(b"PK\x03\x04" + b"\x00" * 4096)
+
+        profiles = _write_profiles(tmpdir)
+        tmp_proc = types.SimpleNamespace(name=profiles["process.json"])
+        tmp_fil = types.SimpleNamespace(name=profiles["filament.json"])
+        args = _slice_args(tmpdir, infile)
+
+        stderr = "Failed to create GLFW window ... skip thumbnail"
+        FakePopen = _fake_popen_factory(1, stdout="", stderr=stderr)
+
+        with patch.object(slicer.subprocess, "Popen", FakePopen), \
+             patch.object(slicer, "_slicer_executable_problem", return_value=None), \
+             patch.object(slicer, "_create_temp_profiles", return_value=(tmp_proc, tmp_fil)), \
+             patch.object(slicer, "_validate_slice_options", return_value=None), \
+             patch.object(slicer.os.path, "exists", return_value=True), \
+             patch.object(slicer.os.path, "getsize", return_value=4100), \
+             settings_ctx(orca_slicer="/usr/bin/true", profiles_dir=tmpdir):
+            with pytest.raises((SystemExit, BambuError)) as excinfo:
+                slicer.cmd_slice(args)
+
+        code = getattr(excinfo.value, "exit_code", getattr(excinfo.value, "code", None))
+        assert code not in (0, None), f"corrupt .3mf must exit non-zero, got {code!r}"
 
 
 def test_a_real_error_still_fails():

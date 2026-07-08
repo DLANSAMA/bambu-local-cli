@@ -29,6 +29,32 @@ def test_sliced_output_path_variants(tmp_path):
     assert "model" in str(p2)
 
 
+def test_is_valid_sliced_3mf_accepts_minimal_package(tmp_path):
+    import zipfile
+
+    path = tmp_path / "ok.3mf"
+    with zipfile.ZipFile(path, "w") as zf:
+        zf.writestr("[Content_Types].xml", "<Types/>")
+        zf.writestr("3D/3dmodel.model", "<model/>")
+        zf.writestr("Metadata/plate_1.gcode", "G28\n")
+    assert S._is_valid_sliced_3mf(str(path)) is True
+
+
+def test_is_valid_sliced_3mf_rejects_truncated_garbage(tmp_path):
+    path = tmp_path / "bad.3mf"
+    path.write_bytes(b"PK\x03\x04" + b"\x00" * 256)
+    assert S._is_valid_sliced_3mf(str(path)) is False
+
+
+def test_is_valid_sliced_3mf_rejects_zip_missing_structure(tmp_path):
+    import zipfile
+
+    path = tmp_path / "empty_struct.3mf"
+    with zipfile.ZipFile(path, "w") as zf:
+        zf.writestr("readme.txt", "not a 3mf")
+    assert S._is_valid_sliced_3mf(str(path)) is False
+
+
 def test_validate_slice_options_bad_infill():
     args = Namespace(copies=0, infill=15, pattern="grid")
     err = S._validate_slice_options(args)
