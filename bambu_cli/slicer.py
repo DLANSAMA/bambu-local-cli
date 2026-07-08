@@ -609,7 +609,7 @@ def _is_valid_sliced_3mf(path: str) -> bool:
             if zf.testzip() is not None:
                 return False
             names = set(zf.namelist())
-    except (OSError, zipfile.BadZipFile):
+    except (OSError, zipfile.BadZipFile, TypeError, ValueError):
         return False
 
     if "[Content_Types].xml" not in names:
