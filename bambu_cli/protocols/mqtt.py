@@ -37,7 +37,10 @@ def _require_mqtt():
 
             mqtt = paho_mqtt
         except ImportError:
-            logger.error("Missing dependency: paho-mqtt. Install with: python -m pip install -r requirements.txt")
+            logger.error(
+                "Missing dependency: paho-mqtt. Reinstall the package "
+                "(e.g. `uv pip install -e .` from a source checkout, or `pip install bambu-local-cli`)."
+            )
             from bambu_cli.constants import EXIT_CONFIG_ERROR
 
             sys.exit(EXIT_CONFIG_ERROR)

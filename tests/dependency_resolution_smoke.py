@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify advertised Python support can resolve install dependencies."""
+"""Verify advertised Python support can resolve install dependencies from pyproject.toml."""
 import shutil
 import subprocess
 import sys
@@ -10,7 +10,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 PYTHON_FLOOR = "3.9"
-REQUIRED_PACKAGES = {"paho-mqtt", "zeroconf"}
+REQUIRED_PACKAGES = {"paho-mqtt", "zeroconf", "rich"}
 
 
 def run_command(command):
@@ -45,27 +45,12 @@ def _project_dependencies():
     }
 
 
-def _requirements_dependencies():
-    dependencies = set()
-    for line in (ROOT / "requirements.txt").read_text(encoding="utf-8").splitlines():
-        line = line.split("#", 1)[0].strip()
-        if line:
-            dependencies.add(line)
-    return dependencies
-
-
-def check_declared_dependencies_match():
+def check_declared_dependencies():
     project_deps = _project_dependencies()
-    requirements_deps = _requirements_dependencies()
-    if project_deps != requirements_deps:
-        raise SystemExit(
-            "pyproject.toml dependencies do not match requirements.txt: "
-            f"pyproject={sorted(project_deps)}, requirements={sorted(requirements_deps)}"
-        )
     lowered = {dependency.lower().split(">", 1)[0].split("=", 1)[0].split("<", 1)[0] for dependency in project_deps}
     missing = sorted(package for package in REQUIRED_PACKAGES if package not in lowered)
     if missing:
-        raise SystemExit(f"declared dependencies missing required packages: {missing}")
+        raise SystemExit(f"pyproject.toml dependencies missing required packages: {missing}")
 
 
 def check_with_uv():
@@ -115,7 +100,7 @@ def check_with_pip():
 
 
 def main():
-    check_declared_dependencies_match()
+    check_declared_dependencies()
     if shutil.which("uv"):
         check_with_uv()
     else:

@@ -7,7 +7,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ### Changed
 - Package renamed to `bambu-local-cli` for PyPI publication (the `bambu-cli` name on PyPI belongs to an unrelated project). The installed command remains `bambu-cli`.
-- Wheels no longer bundle non-runtime files (`README.md`, `AGENTS.md`, `requirements.txt` inside the package).
+- Wheels no longer bundle non-runtime files (`README.md`, `AGENTS.md` inside the package).
+
+### Removed
+- `requirements.txt`, which duplicated the `dependencies` already declared in `pyproject.toml`. Install with `uv pip install -e .` (or `pip install bambu-local-cli`) instead.
 
 ### Added
 - PyPI trusted publishing on tagged releases (`v*`).

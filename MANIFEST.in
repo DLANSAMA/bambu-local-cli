@@ -3,7 +3,6 @@ include README.md
 include AGENTS.md
 include MANIFEST.in
 include pyproject.toml
-include requirements.txt
 recursive-include bambu_cli *.py
 recursive-include scripts *.py
 recursive-include tests *.py

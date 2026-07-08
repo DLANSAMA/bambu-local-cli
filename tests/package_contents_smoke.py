@@ -12,7 +12,6 @@ REQUIRED_SDIST_FILES = {
     "README.md",
     "AGENTS.md",
     "pyproject.toml",
-    "requirements.txt",
     "bambu_cli/__init__.py",
     "bambu_cli/bambu.py",
     "bambu_cli/cli.py",
@@ -62,7 +61,6 @@ FORBIDDEN_WHEEL_FILES = {
 FORBIDDEN_WHEEL_DATA_SUFFIXES = {
     "bambu_cli/README.md",
     "bambu_cli/AGENTS.md",
-    "bambu_cli/requirements.txt",
 }
 
 STATIC_METADATA_SNIPPETS = {
@@ -164,38 +162,6 @@ def _project_script_entry():
     if not match:
         raise SystemExit("pyproject.toml is missing a console script entry")
     return match.group(1), match.group(2)
-
-
-def _project_dependencies():
-    text = Path("pyproject.toml").read_text(encoding="utf-8")
-    match = re.search(r'^dependencies\s*=\s*\[(.*?)^\]', text, re.MULTILINE | re.DOTALL)
-    if not match:
-        raise SystemExit("pyproject.toml is missing project dependencies")
-    return {
-        dep.strip()
-        for dep in re.findall(r'"([^"]+)"', match.group(1))
-        if dep.strip()
-    }
-
-
-def _requirements_dependencies():
-    deps = set()
-    for line in Path("requirements.txt").read_text(encoding="utf-8").splitlines():
-        stripped = line.split("#", 1)[0].strip()
-        if stripped:
-            deps.add(stripped)
-    return deps
-
-
-def check_dependency_declarations_match():
-    project_deps = _project_dependencies()
-    requirements_deps = _requirements_dependencies()
-    if project_deps != requirements_deps:
-        raise SystemExit(
-            "requirements.txt and pyproject.toml dependencies differ: "
-            f"requirements-only={sorted(requirements_deps - project_deps)}, "
-            f"pyproject-only={sorted(project_deps - requirements_deps)}"
-        )
 
 
 def check_version_consistency():
@@ -351,7 +317,6 @@ def check_wheel(dist_dir):
 def main():
     dist_dir = Path("dist")
     check_version_consistency()
-    check_dependency_declarations_match()
     check_gitignore_release_artifacts()
     check_agent_docs_current()
     check_sdist(dist_dir)

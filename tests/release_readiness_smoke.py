@@ -15,7 +15,6 @@ REQUIRED_FILES = {
     "bambu_cli/__init__.py",
     "bambu_cli/bambu.py",
     "pyproject.toml",
-    "requirements.txt",
     "scripts/__init__.py",
     "scripts/bambu.py",
     "tests/agent_cli_smoke.py",
