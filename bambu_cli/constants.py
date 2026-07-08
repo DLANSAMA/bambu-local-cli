@@ -63,6 +63,16 @@ DEFAULT_MAX_DOWNLOAD_MB = 2048
 MAX_DOWNLOAD_FILENAME_LENGTH = 160
 DNS_CACHE_TTL = 300
 
+# Physical safety bounds for slice / print options (Bambu-class FDM printers).
+# Nozzle: ambient through high-temp engineering filaments (~300 °C); reject absurd values.
+# Bed: Bambu heated beds top out near 120 °C; allow headroom to 150.
+# AMS: 4 slots per unit; up to 4 units on an AMS hub → indexes 0..15.
+MIN_NOZZLE_TEMP_C = 0
+MAX_NOZZLE_TEMP_C = 350
+MIN_BED_TEMP_C = 0
+MAX_BED_TEMP_C = 150
+MAX_AMS_SLOT_INDEX = 15
+
 # File-type tables
 BED_PLATE_TYPES = ["cool_plate_temp", "hot_plate_temp", "textured_plate_temp", "eng_plate_temp"]
 SLICEABLE_EXTENSIONS = (".stl", ".step", ".stp", ".obj")

@@ -638,6 +638,32 @@ def test_ams_mapping_negative_slot_fails(tmp_path, capsys):
     assert "zero or positive" in _read_json(capsys)["error"].lower()
 
 
+def test_ams_mapping_slot_too_high_fails(tmp_path, capsys):
+    """AMS has 4 slots/unit; reject indexes beyond a realistic multi-AMS max."""
+    ready = tmp_path / "model.3mf"
+    ready.write_bytes(b"x" * 10)
+    args = _parse(["job", str(ready), "--confirm", "--use-ams", "--ams-mapping", "100", "--json"])
+    with pytest.raises((SystemExit, BambuError)) as excinfo:
+        _run_job(_ctx(), args, JobSteps())
+    assert getattr(excinfo.value, "exit_code", getattr(excinfo.value, "code", None)) == EXIT_COMMAND_ERROR
+    payload = _read_json(capsys)
+    assert payload["failed_step"] == "validate"
+    assert "100" in payload["error"] or "slot" in payload["error"].lower()
+
+
+def test_use_ams_without_mapping_fails(tmp_path, capsys):
+    """--use-ams with no mapping must not silently omit ams_mapping for firmware defaults."""
+    ready = tmp_path / "model.3mf"
+    ready.write_bytes(b"x" * 10)
+    args = _parse(["job", str(ready), "--confirm", "--use-ams", "--json"])
+    with pytest.raises((SystemExit, BambuError)) as excinfo:
+        _run_job(_ctx(), args, JobSteps())
+    assert getattr(excinfo.value, "exit_code", getattr(excinfo.value, "code", None)) == EXIT_COMMAND_ERROR
+    payload = _read_json(capsys)
+    assert payload["failed_step"] == "validate"
+    assert "--use-ams" in payload["error"] and "--ams-mapping" in payload["error"]
+
+
 # ---------------------------------------------------------------------------
 # --name is URL-only; warn and ignore for a local source
 # ---------------------------------------------------------------------------

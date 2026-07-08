@@ -97,6 +97,12 @@ def _directory_input_message(path: str) -> str:  # pragma: no cover -- slicer he
 
 def _validate_slice_options(args: argparse.Namespace) -> str | None:  # pragma: no cover -- slice option validation
     from bambu_cli.cli import _namespace_get
+    from bambu_cli.constants import (
+        MAX_BED_TEMP_C,
+        MAX_NOZZLE_TEMP_C,
+        MIN_BED_TEMP_C,
+        MIN_NOZZLE_TEMP_C,
+    )
 
     copies = getattr(args, "copies", 1)
     if isinstance(copies, int) and copies < 1:
@@ -104,6 +110,12 @@ def _validate_slice_options(args: argparse.Namespace) -> str | None:  # pragma: 
     infill = getattr(args, "infill", 15)
     if isinstance(infill, int) and not (0 <= infill <= 100):
         return f"--infill must be between 0 and 100 (got {infill})"
+    nozzle_temp = getattr(args, "nozzle_temp", None)
+    if isinstance(nozzle_temp, int) and not (MIN_NOZZLE_TEMP_C <= nozzle_temp <= MAX_NOZZLE_TEMP_C):
+        return f"--nozzle-temp must be between {MIN_NOZZLE_TEMP_C} and {MAX_NOZZLE_TEMP_C} °C (got {nozzle_temp})"
+    bed_temp = getattr(args, "bed_temp", None)
+    if isinstance(bed_temp, int) and not (MIN_BED_TEMP_C <= bed_temp <= MAX_BED_TEMP_C):
+        return f"--bed-temp must be between {MIN_BED_TEMP_C} and {MAX_BED_TEMP_C} °C (got {bed_temp})"
     wall_type = _namespace_get(args, "wall_type", None)
     if wall_type and wall_type not in ("normal", "classic", "archaic"):
         return "--wall-type must be one of: normal, classic"

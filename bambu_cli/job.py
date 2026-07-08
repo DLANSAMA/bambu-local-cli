@@ -240,10 +240,16 @@ def _predicted_url_remote_name(url, args):  # pragma: no cover -- job helper
 
 def _parse_print_options(args):  # pragma: no cover -- job helper
     """Validate print-only options and return the parsed AMS mapping."""
+    from bambu_cli.constants import MAX_AMS_SLOT_INDEX
+
     raw_mapping = getattr(args, "ams_mapping", None)
+    use_ams = getattr(args, "use_ams", False)
+    if use_ams and not raw_mapping:
+        # Do not silently omit ams_mapping and let firmware pick a default tray.
+        return None, "--use-ams requires --ams-mapping (comma-separated slot indexes, e.g. '0' or '0,1,2')"
     if not raw_mapping:
         return None, None
-    if not getattr(args, "use_ams", False):
+    if not use_ams:
         return None, "--ams-mapping requires --use-ams"
     try:
         clean_mapping = raw_mapping.strip("[]")
@@ -254,6 +260,12 @@ def _parse_print_options(args):  # pragma: no cover -- job helper
         return None, "Invalid AMS mapping format. Use comma-separated integers like '0' or '0,1,2'"
     if any(slot < 0 for slot in mapping):
         return None, "Invalid AMS mapping format. Slot indexes must be zero or positive integers like '0' or '0,1,2'"
+    if any(slot > MAX_AMS_SLOT_INDEX for slot in mapping):
+        return (
+            None,
+            f"Invalid AMS mapping: slot indexes must be between 0 and {MAX_AMS_SLOT_INDEX} "
+            f"(4 slots per AMS unit, up to 4 units; got {mapping})",
+        )
     return mapping, None
 
 
