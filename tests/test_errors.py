@@ -86,7 +86,6 @@ def test_main_converts_bambu_error_to_json_payload(capsys):
     with patch("sys.argv", ["bambu.py", "status", "--json"]), \
             patch("bambu_cli.bambu.setup_logging"), \
             patch("socket.getaddrinfo", return_value=[]), \
-            patch("bambu_cli.bambu.PRINTER_IP", "127.0.0.1"), \
             patch("bambu_cli.bambu.cmd_status", side_effect=raise_it, create=True):
         with pytest.raises(SystemExit) as excinfo:
             bambu.main()
@@ -108,7 +107,6 @@ def test_main_non_json_mode_exits_with_code():
     with patch("sys.argv", ["bambu.py", "status"]), \
             patch("bambu_cli.bambu.setup_logging"), \
             patch("socket.getaddrinfo", return_value=[]), \
-            patch("bambu_cli.bambu.PRINTER_IP", "127.0.0.1"), \
             patch("bambu_cli.bambu.cmd_status", side_effect=raise_it, create=True):
         with pytest.raises(SystemExit) as excinfo:
             bambu.main()

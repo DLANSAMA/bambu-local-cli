@@ -23,7 +23,8 @@ class TestBambuDoctor(unittest.TestCase):
     @patch('sys.exit')
     @patch('bambu_cli.bambu.logger')
     def test_cmd_doctor_mqtt_fail(self, mock_logger, mock_exit, mock_get_status, mock_load):
-        from bambu_cli.bambu import cmd_doctor, PRINTER_IP
+        from bambu_cli.bambu import cmd_doctor
+        from bambu_cli.context import current_settings
         mock_load.return_value = {"printer_ip": "1.2.3.4"}
         mock_get_status.return_value = None
 
@@ -32,7 +33,7 @@ class TestBambuDoctor(unittest.TestCase):
             cmd_doctor(MagicMock())
 
         self.assertEqual(cm.exception.code, 2)
-        mock_logger.error.assert_any_call(f"   ❌ MQTT connection failed. Ensure printer at {PRINTER_IP} is on and access code is correct.")
+        mock_logger.error.assert_any_call(f"   ❌ MQTT connection failed. Ensure printer at {current_settings().printer_ip} is on and access code is correct.")
 
     @patch('bambu_cli.bambu.load_config')
     @patch('bambu_cli.bambu.get_status')
@@ -127,14 +128,11 @@ class TestBambuSimulation(unittest.TestCase):
         args.verbose = False
         args.sim = True
 
-        # Manually enable sim mode for the test
-        bambu.SIMULATION_MODE = True
-        try:
+        # Enable sim mode via the runtime context for the test
+        with settings_ctx(simulation=True):
             cmd_status(args)
             self.assertTrue(any("Fetching simulated printer status" in call[0][0] for call in mock_logger.info.call_args_list))
             self.assertTrue(any("State: IDLE" in call[0][0] for call in mock_logger.info.call_args_list))
-        finally:
-            bambu.SIMULATION_MODE = False
 
     @patch('bambu_cli.logging_utils.logger')
     @patch('bambu_cli.commands.logger')
@@ -150,24 +148,23 @@ class TestBambuSimulation(unittest.TestCase):
         from bambu_cli.protocols.ftps import connection_manager
         connection_manager.clear()
 
-        bambu.SIMULATION_MODE = True
-        try:
-            # Use a real file (not mock_open) so _SimFtp's fp.tell()/seek()-based
-            # size bookkeeping — and upload_file's post-transfer size
-            # verification against it — reflect actual byte counts.
-            local_path = os.path.join(os.getcwd(), "test.3mf")
-            with open(local_path, "wb") as f:
-                f.write(b"x" * 1024)
+        with settings_ctx(simulation=True):
             try:
-                cmd_upload(args)
-            finally:
-                os.unlink(local_path)
+                # Use a real file (not mock_open) so _SimFtp's fp.tell()/seek()-based
+                # size bookkeeping — and upload_file's post-transfer size
+                # verification against it — reflect actual byte counts.
+                local_path = os.path.join(os.getcwd(), "test.3mf")
+                with open(local_path, "wb") as f:
+                    f.write(b"x" * 1024)
+                try:
+                    cmd_upload(args)
+                finally:
+                    os.unlink(local_path)
 
-            self.assertTrue(any("Connecting to simulated FTPS server" in call[0][0] for call in mock_ftps_logger.info.call_args_list))
-            self.assertTrue(any("Uploaded test.3mf to printer" in call[0][0] for call in mock_commands_logger.info.call_args_list))
-        finally:
-            bambu.SIMULATION_MODE = False
-            connection_manager.clear()
+                self.assertTrue(any("Connecting to simulated FTPS server" in call[0][0] for call in mock_ftps_logger.info.call_args_list))
+                self.assertTrue(any("Uploaded test.3mf to printer" in call[0][0] for call in mock_commands_logger.info.call_args_list))
+            finally:
+                connection_manager.clear()
 
 
 class TestBambuSecurity(unittest.TestCase):

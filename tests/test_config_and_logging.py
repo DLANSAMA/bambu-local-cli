@@ -91,13 +91,9 @@ class TestLoadConfig(unittest.TestCase):
 
 class TestLoadAccessCode(unittest.TestCase):
 
-    @patch('bambu_cli.bambu._cfg', {'access_code': 'inline_secret'})
     def test_load_access_code_inline(self):
-        from bambu_cli.bambu import load_access_code
-        if hasattr(load_access_code, 'cache_clear'):
-            load_access_code.cache_clear()
         import bambu_cli.bambu
-        with patch.dict(bambu_cli.bambu._cfg, {'access_code': 'inline_secret'}, clear=True):
+        with config_ctx({'access_code': 'inline_secret'}):
             self.assertEqual(bambu_cli.bambu.load_access_code(), 'inline_secret')
 
     @patch('os.path.expanduser')
@@ -107,7 +103,7 @@ class TestLoadAccessCode(unittest.TestCase):
         if hasattr(load_access_code, 'cache_clear'):
             load_access_code.cache_clear()
         import bambu_cli.bambu
-        with patch.dict(bambu_cli.bambu._cfg, {'access_code_file': '~/.config/bambu/secret'}, clear=True):
+        with config_ctx({'access_code_file': '~/.config/bambu/secret'}):
             mock_expanduser.return_value = '/home/user/.config/bambu/secret'
             self.assertEqual(bambu_cli.bambu.load_access_code(), 'file_secret')
 
@@ -120,7 +116,7 @@ class TestLoadAccessCode(unittest.TestCase):
         if hasattr(load_access_code, 'cache_clear'):
             load_access_code.cache_clear()
         import bambu_cli.bambu
-        with patch.dict(bambu_cli.bambu._cfg, {'access_code_file': '~/.config/bambu/missing'}, clear=True):
+        with config_ctx({'access_code_file': '~/.config/bambu/missing'}):
             mock_exit.side_effect = SystemExit(1)
             with self.assertRaises(SystemExit) as cm:
                 bambu_cli.bambu.load_access_code()
@@ -134,7 +130,7 @@ class TestLoadAccessCode(unittest.TestCase):
         if hasattr(load_access_code, 'cache_clear'):
             load_access_code.cache_clear()
         import bambu_cli.bambu
-        with patch.dict(bambu_cli.bambu._cfg, {}, clear=True):
+        with config_ctx({}):
             mock_exit.side_effect = SystemExit(1)
             with self.assertRaises(SystemExit) as cm:
                 bambu_cli.bambu.load_access_code()

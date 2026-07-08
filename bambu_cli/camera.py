@@ -117,7 +117,7 @@ def _cmd_snapshot(args, ctx=None):
     """Capture a snapshot from the printer camera via BambuP1Streamer."""
     from bambu_cli import bambu
 
-    ctx = ctx or RuntimeContext.from_globals(args)
+    ctx = ctx or RuntimeContext.for_request(args)
     outpath = _expand_path(args.output or "printer_snapshot.jpg")
     if outpath.startswith("-"):
         message = f"Invalid output path: {_path_for_message(outpath)}"

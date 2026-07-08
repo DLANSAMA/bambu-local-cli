@@ -2,17 +2,17 @@
 
 import pytest
 
-from bambu_cli import context
+from tests.bambu_test_base import install_baseline_context
 
 
 @pytest.fixture(autouse=True)
 def _reset_runtime_context():
     """Isolate the process-wide RuntimeContext between tests.
 
-    ``main()`` and some tests install a context via ``context.set_current()``;
-    reset it around every test so a pinned context can't leak into a later test
-    that relies on reading the (patched) module-global fallback.
+    Config state lives on the installed RuntimeContext; reset it to the shared
+    baseline around every test so a context installed by one test (e.g. via
+    ``main()`` or ``set_current``) can't leak into the next.
     """
-    context.set_current(None)
+    install_baseline_context()
     yield
-    context.set_current(None)
+    install_baseline_context()

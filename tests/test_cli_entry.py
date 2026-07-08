@@ -4,11 +4,10 @@ from tests.bambu_test_base import *  # noqa: F401,F403
 class TestMain(unittest.TestCase):
 
     def tearDown(self):
-        # main() installs a process-wide RuntimeContext; clear it so it can't
-        # leak into later tests (the pytest suite does this via a conftest
-        # fixture, but the CI `unittest` line needs it here).
-        from bambu_cli import context
-        context.set_current(None)
+        # main() installs a process-wide RuntimeContext; reset it to the shared
+        # baseline so it can't leak into later tests (the pytest suite does this
+        # via a conftest fixture, but the CI `unittest` line needs it here).
+        install_baseline_context()
 
     @patch('sys.argv', ['bambu.py', 'status'])
     @patch('bambu_cli.bambu.cmd_status')
@@ -17,8 +16,7 @@ class TestMain(unittest.TestCase):
     def test_main_argparse_subcommand(self, mock_getaddrinfo, mock_setup_logging, mock_cmd_status):
         import bambu_cli.bambu
         mock_getaddrinfo.return_value = []
-        with patch('bambu_cli.bambu.PRINTER_IP', '192.168.1.1'):
-            bambu_cli.bambu.main()
+        bambu_cli.bambu.main()
         mock_cmd_status.assert_called_once()
         mock_setup_logging.assert_called_once_with(False)
 
@@ -27,13 +25,9 @@ class TestMain(unittest.TestCase):
     @patch('bambu_cli.bambu.setup_logging')
     def test_main_sim_flag(self, mock_setup_logging, mock_cmd_status):
         import bambu_cli.bambu
-        orig_sim = bambu_cli.bambu.SIMULATION_MODE
-        try:
-            with patch('bambu_cli.bambu.PRINTER_IP', '192.168.1.1'):
-                bambu_cli.bambu.main()
-            self.assertTrue(bambu_cli.bambu.SIMULATION_MODE)
-        finally:
-            bambu_cli.bambu.SIMULATION_MODE = orig_sim
+        from bambu_cli import context
+        bambu_cli.bambu.main()
+        self.assertTrue(context.get_current().simulation)
 
     @patch('sys.argv', ['bambu.py', 'status'])
     @patch('bambu_cli.bambu.logger')
@@ -41,9 +35,13 @@ class TestMain(unittest.TestCase):
     @patch('socket.getaddrinfo', side_effect=socket.gaierror)
     def test_main_invalid_printer_ip(self, mock_getaddrinfo, mock_exit, mock_logger):
         import bambu_cli.bambu
+        from bambu_cli import context
+        from bambu_cli.context import RuntimeContext, Settings
         mock_exit.side_effect = SystemExit(1)
-        with patch('bambu_cli.bambu.PRINTER_IP', 'invalid_ip'), \
-                patch('bambu_cli.bambu.load_config', return_value=None):
+        # Install a context with an unresolvable IP; mock load_config so main()
+        # doesn't overwrite it from the on-disk config.
+        context.set_current(RuntimeContext(settings=Settings(printer_ip='invalid_ip')))
+        with patch('bambu_cli.bambu.load_config', return_value=None):
             with self.assertRaises(SystemExit) as cm:
                 bambu_cli.bambu.main()
 

@@ -199,32 +199,30 @@ def apply_config(cfg):
     """Apply a configuration dictionary to the runtime state.
 
     The dict is parsed once into a typed :class:`bambu_cli.context.Settings`
-    (the canonical parse), which is then mirrored onto the ``bambu.<NAME>``
-    module globals so legacy readers and test patches keep working.
+    (the canonical parse) and installed on a fresh
+    :class:`bambu_cli.context.RuntimeContext` as the process-wide source of
+    truth. Request-scoped flags (simulation/json_mode) already on the current
+    context are preserved.
     """
-    from bambu_cli import bambu
-    from bambu_cli.context import Settings
+    from bambu_cli.context import RuntimeContext, Settings, get_current, set_current
 
     if not cfg:
         return
     settings = Settings.from_config(cfg)
-    bambu._cfg = cfg
-    bambu.PRINTER_IP = settings.printer_ip
-    bambu.SERIAL = settings.serial
-    bambu.MQTT_PORT = settings.mqtt_port
-    bambu.INSECURE_TLS = settings.insecure_tls
     if settings.insecure_tls:
         logger.warning(
             "🚨 SECURITY WARNING: 'insecure_tls' is enabled! TLS certificate validation is DISABLED for all connections. Your network traffic is vulnerable to MITM attacks."
         )
-    bambu.ORCA_SLICER = settings.orca_slicer
-    bambu.PROFILES_DIR = settings.profiles_dir
-    bambu.PRINTER_MODEL = settings.printer_model
-    bambu.NOZZLE_SIZE = settings.nozzle_size
-    bambu.CAMERA_IMAGE = settings.camera_image
-    bambu.CAMERA_CONTAINER_NAME = settings.camera_container_name
-    bambu.CAMERA_PORT = settings.camera_port
-    bambu.CAMERA_STREAM_URL = settings.camera_stream_url
+    prev = get_current()
+    set_current(
+        RuntimeContext(
+            settings=settings,
+            config=cfg,
+            simulation=prev.simulation,
+            json_mode=prev.json_mode,
+            config_path=prev.config_path,
+        )
+    )
 
 
 _INLINE_ACCESS_CODE_WARNED = False

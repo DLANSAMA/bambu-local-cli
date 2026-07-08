@@ -522,15 +522,19 @@ def main():
         setup_logging(verbose_val, json_mode=json_mode_val)
     else:
         setup_logging(verbose_val)
-    bambu.SIMULATION_MODE = bool(getattr(args, "sim", False))
-    if bambu.SIMULATION_MODE:
+    simulation = bool(getattr(args, "sim", False))
+    if simulation:
         logger.info("🤖 Simulation mode enabled.")
 
     bambu.load_config(exit_on_fail=False)
 
+    # load_config installs a RuntimeContext from the parsed config; layer the
+    # request-scoped flags (simulation / json output) onto it.
     from bambu_cli import context as _context
 
-    _context.set_current(_context.RuntimeContext.from_globals(args))
+    _ctx = _context.get_current()
+    _ctx.simulation = simulation
+    _ctx.json_mode = _json_mode_requested(args)
 
     if _json_setup_should_be_noninteractive(args):
         bambu._cmd_setup_noninteractive(args)

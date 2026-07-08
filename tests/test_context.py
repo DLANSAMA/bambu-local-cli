@@ -61,38 +61,6 @@ def test_settings_from_config_alt_keys_and_none():
     assert settings.nozzle_size == "0.2"
 
 
-def test_settings_from_globals_reflects_patched_bambu():
-    with patch.object(bambu, "PRINTER_IP", "192.168.9.9"), \
-         patch.object(bambu, "SERIAL", "SNXYZ"), \
-         patch.object(bambu, "MQTT_PORT", 4321), \
-         patch.object(bambu, "INSECURE_TLS", True), \
-         patch.object(bambu, "ORCA_SLICER", "/orca"), \
-         patch.object(bambu, "PROFILES_DIR", "/profiles"), \
-         patch.object(bambu, "PRINTER_MODEL", "X1E"), \
-         patch.object(bambu, "NOZZLE_SIZE", "0.8"), \
-         patch.object(bambu, "CAMERA_IMAGE", "img"), \
-         patch.object(bambu, "CAMERA_CONTAINER_NAME", "cont"), \
-         patch.object(bambu, "CAMERA_PORT", "1:2"), \
-         patch.object(bambu, "CAMERA_STREAM_URL", "http://stream"), \
-         patch.object(bambu, "ALLOW_PRIVATE_IPS", True), \
-         patch.object(bambu, "_cfg", {"cert_fingerprint": "ff:ee"}):
-        settings = context.Settings.from_globals()
-    assert settings.printer_ip == "192.168.9.9"
-    assert settings.serial == "SNXYZ"
-    assert settings.mqtt_port == 4321
-    assert settings.insecure_tls is True
-    assert settings.cert_fingerprint == "ff:ee"
-    assert settings.orca_slicer == "/orca"
-    assert settings.profiles_dir == "/profiles"
-    assert settings.printer_model == "X1E"
-    assert settings.nozzle_size == "0.8"
-    assert settings.camera_image == "img"
-    assert settings.camera_container_name == "cont"
-    assert settings.camera_port == "1:2"
-    assert settings.camera_stream_url == "http://stream"
-    assert settings.allow_private_ips is True
-
-
 def test_runtime_context_printer_simulation_mode():
     settings = context.Settings(printer_ip="1.2.3.4", serial="SN1", mqtt_port=8883,
                                  insecure_tls=False, cert_fingerprint=None)
@@ -134,8 +102,7 @@ def test_get_current_lazy_builds_and_set_current_overrides():
 @patch('bambu_cli.bambu.setup_logging')
 def test_main_populates_current_context(mock_setup_logging, mock_cmd_status):
     context.set_current(None)
-    with patch.object(bambu, "PRINTER_IP", "192.168.1.1"):
-        bambu.main()
+    bambu.main()
     ctx = context.get_current()
     assert ctx.simulation is True
     context.set_current(None)

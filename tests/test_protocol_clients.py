@@ -30,7 +30,6 @@ class TestImplicitFTPS(unittest.TestCase):
 
     @patch('bambu_cli.bambu.socket.create_connection')
     @patch('bambu_cli.bambu.ssl.SSLContext')
-    @patch('bambu_cli.bambu.INSECURE_TLS', False)
     def test_implicit_ftps_secure(self, mock_ssl_context, mock_create_conn):
         from bambu_cli.bambu import ImplicitFTPS
         mock_sock = MagicMock()
@@ -57,7 +56,7 @@ class TestSendCommand(unittest.TestCase):
 
     @patch('bambu_cli.protocols.mqtt.create_mqtt_client')
     def test_send_command_success(self, mock_create):
-        from bambu_cli.bambu import send_command, SERIAL
+        from bambu_cli.bambu import send_command
         mock_client = MagicMock()
         mock_create.return_value = mock_client
 
@@ -72,7 +71,7 @@ class TestSendCommand(unittest.TestCase):
 
         self.assertTrue(result)
         mock_client.connect.assert_called_with('192.168.1.1', 8883, keepalive=10)
-        topic = f"device/{SERIAL}/request"
+        topic = f"device/{printer.serial}/request"
         mock_client.publish.assert_called_once_with(topic, '{"test": "payload"}')
         mock_client.loop_start.assert_called_once()
         mock_client.loop_stop.assert_called_once()

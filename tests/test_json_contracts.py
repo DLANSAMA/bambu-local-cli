@@ -786,10 +786,11 @@ def test_version_json_shape(monkeypatch, tmp_path, capsys):
 # ---------------------------------------------------------------------------
 
 def test_config_error_shape_for_network_command(monkeypatch, tmp_path, capsys):
-    # Other tests in this module load a real (sim) config, which mutates
-    # bambu.PRINTER_IP as module-global state; force the "never configured"
-    # state explicitly so this test doesn't depend on run order.
-    monkeypatch.setattr(bambu, "PRINTER_IP", "0.0.0.0")
+    # Force the "never configured" state (default printer_ip 0.0.0.0)
+    # explicitly so this test doesn't depend on run order.
+    from bambu_cli import context
+    from bambu_cli.context import RuntimeContext
+    context.set_current(RuntimeContext())
     exc = run_main(monkeypatch, tmp_path, ["status", "--json"])
     assert exc is not None and exc.code == 1
     payload = read_json(capsys)

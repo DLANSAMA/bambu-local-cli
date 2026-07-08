@@ -31,17 +31,19 @@ Command logic lives in the sibling modules (cli, commands, download, job,
 setup_cmd, camera, slicer, config, printer, protocols); every public and
 private helper is reachable through this module via a lazy ``__getattr__``
 forwarder, so ``from bambu_cli import bambu`` remains a stable facade for
-tests and scripts, and so runtime state can be patched in one place
-(``bambu.SIMULATION_MODE``, ``bambu.PRINTER_IP``, ...).
+tests and scripts.
+
+Runtime config state is NOT held here — it lives on the installed
+``RuntimeContext`` (``bambu_cli.context``); read it via
+``context.current_settings()`` / ``current_config()``.
 
 READ-ONLY COMPAT SURFACE: this facade is frozen. Do not add new names to
 ``_FACADE_MODULES`` or introduce new module-level helpers/re-exports here —
 new code should call ``get_printer()`` (or the equivalent focused module,
 e.g. ``bambu_cli.slicer``, ``bambu_cli.context``) directly instead of going
-through ``bambu.<name>``. The existing runtime-state globals
-(``SIMULATION_MODE``, ``PRINTER_IP``, ...) and the ``__getattr__``
-forwarding mechanism stay as-is — tests and scripts depend on every
-existing name continuing to resolve through this module.
+through ``bambu.<name>``. The ``__getattr__`` forwarding mechanism stays
+as-is — tests and scripts depend on existing names continuing to resolve
+through this module.
 """
 
 import importlib
@@ -57,25 +59,11 @@ if sys.platform == "win32":
             pass
 
 # --- Runtime state -----------------------------------------------------------
-# Mutable, config-derived globals. Modules read these via bambu.<NAME> so a
-# loaded config (config.apply_config) or a test patch takes effect everywhere.
-SIMULATION_MODE = False
-ALLOW_PRIVATE_IPS = False
+# Config-derived runtime state now lives on the installed RuntimeContext
+# (bambu_cli.context); read it via context.current_settings()/current_config().
+# The old mutable module globals (PRINTER_IP, ORCA_SLICER, SIMULATION_MODE, …)
+# have been removed.
 _LAST_ERROR_PAYLOAD = None  # canonical copies live in bambu_cli.utils
-
-_cfg = {}
-PRINTER_IP = "0.0.0.0"
-SERIAL = "UNKNOWN"
-MQTT_PORT = 8883
-INSECURE_TLS = False
-ORCA_SLICER = ""
-PROFILES_DIR = ""
-PRINTER_MODEL = "P1P"
-NOZZLE_SIZE = "0.4"
-CAMERA_IMAGE = "bambu_p1_streamer"
-CAMERA_CONTAINER_NAME = "bambu_camera"
-CAMERA_PORT = "1985:1984"
-CAMERA_STREAM_URL = ""
 
 # Logging
 logger = logging.getLogger("bambu")
@@ -85,7 +73,10 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s", str
 
 def _redacted_serial():
     """Return a non-identifying serial placeholder for reports written to disk."""
-    return "UNKNOWN" if not SERIAL or SERIAL == "UNKNOWN" else "<redacted>"
+    from bambu_cli.context import current_settings
+
+    serial = current_settings().serial
+    return "UNKNOWN" if not serial or serial == "UNKNOWN" else "<redacted>"
 
 
 # --- Facade ------------------------------------------------------------------

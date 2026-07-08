@@ -28,7 +28,7 @@ def cmd_doctor(args, ctx=None):
     from bambu_cli.protocols.mqtt import probe_cert_fingerprint
     from bambu_cli.utils import emit_json
 
-    ctx = ctx or RuntimeContext.from_globals(args)
+    ctx = ctx or RuntimeContext.for_request(args)
     json_mode = bool(_namespace_get(args, "json", False))
 
     def emit_doctor_failure(failed_step, exit_code, error, extra=None):
@@ -174,7 +174,7 @@ def cmd_light(args, ctx=None):
     from bambu_cli.constants import EXIT_NETWORK_ERROR
     from bambu_cli.utils import emit_json, emit_json_error
 
-    ctx = ctx or RuntimeContext.from_globals(args)
+    ctx = ctx or RuntimeContext.for_request(args)
     action = args.action  # on or off
     val = "on" if action == "on" else "off"
     payload = json.dumps(
@@ -213,7 +213,7 @@ def cmd_pause(args, ctx=None):
     from bambu_cli.constants import EXIT_NETWORK_ERROR
     from bambu_cli.utils import emit_json, emit_json_error
 
-    ctx = ctx or RuntimeContext.from_globals(args)
+    ctx = ctx or RuntimeContext.for_request(args)
     payload = json.dumps({"print": {"sequence_id": get_sequence_id(), "command": "pause"}})
     printer = ctx.printer()
     if not printer.send_command(payload):
@@ -238,7 +238,7 @@ def cmd_resume(args, ctx=None):
     from bambu_cli.constants import EXIT_NETWORK_ERROR
     from bambu_cli.utils import emit_json, emit_json_error
 
-    ctx = ctx or RuntimeContext.from_globals(args)
+    ctx = ctx or RuntimeContext.for_request(args)
     payload = json.dumps({"print": {"sequence_id": get_sequence_id(), "command": "resume"}})
     printer = ctx.printer()
     if not printer.send_command(payload):
@@ -263,7 +263,7 @@ def cmd_stop(args, ctx=None):
     from bambu_cli.constants import EXIT_COMMAND_ERROR, EXIT_NETWORK_ERROR
     from bambu_cli.utils import emit_json, emit_json_error
 
-    ctx = ctx or RuntimeContext.from_globals(args)
+    ctx = ctx or RuntimeContext.for_request(args)
     if not args.confirm:
         logger.warning("⚠️  This will STOP the current print. Add --confirm to proceed.")
         if bool(_namespace_get(args, "json", False)):
@@ -302,7 +302,7 @@ def cmd_upload(args, ctx=None):
     from bambu_cli.printer import get_printer
     from bambu_cli.utils import emit_json, emit_json_error
 
-    ctx = ctx or RuntimeContext.from_globals(args)
+    ctx = ctx or RuntimeContext.for_request(args)
     filepath = bambu._expand_path(args.file)
     if filepath.startswith("-"):
         message = f"Invalid filepath: {bambu._path_for_message(filepath)}"
@@ -473,7 +473,7 @@ def cmd_files(args, ctx=None):
     from bambu_cli.printer import get_printer
     from bambu_cli.utils import emit_json, emit_json_error
 
-    ctx = ctx or RuntimeContext.from_globals(args)
+    ctx = ctx or RuntimeContext.for_request(args)
     json_mode = bool(_namespace_get(args, "json", False))
     try:
         printer = get_printer()
@@ -511,7 +511,7 @@ def cmd_print(args, ctx=None):
     from bambu_cli.constants import EXIT_COMMAND_ERROR, EXIT_FILE_ERROR
     from bambu_cli.utils import emit_json, emit_json_error
 
-    ctx = ctx or RuntimeContext.from_globals(args)
+    ctx = ctx or RuntimeContext.for_request(args)
     dry_run = getattr(args, "dry_run", False)
     basename = str(args.file or "")
 
@@ -605,7 +605,7 @@ def cmd_delete(args, ctx=None):
     from bambu_cli.printer import get_printer
     from bambu_cli.utils import emit_json, emit_json_error
 
-    ctx = ctx or RuntimeContext.from_globals(args)
+    ctx = ctx or RuntimeContext.for_request(args)
     filename = str(args.file or "")
     if bambu._safe_remote_name(filename) is None:
         message = f"Refusing to delete file with unsafe name: {bambu._name_for_message(filename)!r}"
@@ -652,7 +652,7 @@ def cmd_snapshot(args, ctx=None):
     """Capture a camera snapshot using the RTSP Streamer Docker container."""
     from bambu_cli import bambu
 
-    ctx = ctx or RuntimeContext.from_globals(args)
+    ctx = ctx or RuntimeContext.for_request(args)
     bambu._cmd_snapshot(args, ctx=ctx)
 
 
@@ -683,7 +683,7 @@ def cmd_gcode(args, ctx=None):
     from bambu_cli.constants import EXIT_NETWORK_ERROR
     from bambu_cli.utils import emit_json, emit_json_error
 
-    ctx = ctx or RuntimeContext.from_globals(args)
+    ctx = ctx or RuntimeContext.for_request(args)
     gcode = args.code
     payload = json.dumps({"print": {"sequence_id": get_sequence_id(), "command": "gcode_line", "param": gcode}})
     printer = ctx.printer()
@@ -712,7 +712,7 @@ def cmd_status(args, ctx=None):
     from bambu_cli.protocols.mqtt import monitor_status
     from bambu_cli.utils import emit_json
 
-    ctx = ctx or RuntimeContext.from_globals(args)
+    ctx = ctx or RuntimeContext.for_request(args)
     if bool(_namespace_get(args, "monitor", False)):
         monitor_status(args)
         return

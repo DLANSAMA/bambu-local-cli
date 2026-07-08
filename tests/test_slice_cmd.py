@@ -64,11 +64,9 @@ class TestBambuCmdSlice(unittest.TestCase):
     @patch('subprocess.Popen')
     @patch('os.path.exists')
     @patch('bambu_cli.slicer.logger')
-    # Pin the config globals: earlier test modules may leave platform-default
-    # paths (which contain "OrcaSlicer" on macOS/Windows) and flip the
-    # exists_side_effect branches below.
-    @patch('bambu_cli.bambu.PROFILES_DIR', '/tmp/mock_profiles')
-    @patch('bambu_cli.bambu.ORCA_SLICER', '/tmp/mock_orca')
+    # The baseline test context already pins profiles_dir=/tmp/mock_profiles and
+    # orca_slicer=/tmp/mock_orca (conftest resets it per test), so the
+    # exists_side_effect branches below are stable across platforms.
     def test_cmd_slice_missing_machine_profile(self, mock_logger, mock_exists, mock_popen):
         from bambu_cli.bambu import cmd_slice
         args = MagicMock()
@@ -365,8 +363,6 @@ class TestBambuCmdSliceEdgeCases(unittest.TestCase):
     # creation and fails on Windows (WinError 3) unless the dir already exists.
     @patch('os.makedirs', MagicMock())
     @patch('bambu_cli.slicer.logger')
-    @patch('bambu_cli.bambu.PROFILES_DIR', '/tmp')
-    @patch('bambu_cli.bambu.ORCA_SLICER', '/tmp/orca')
     def test_cmd_slice_copies_logic(self, mock_logger, mock_exists, mock_getsize, mock_unlink, mock_create, mock_run):
         from bambu_cli.bambu import cmd_slice
         mock_exists.return_value = True
@@ -392,7 +388,8 @@ class TestBambuCmdSliceEdgeCases(unittest.TestCase):
         args.infill = 15
         args.pattern = "grid"
 
-        with patch('platform.system', return_value="Windows"):
+        with settings_ctx(profiles_dir='/tmp', orca_slicer='/tmp/orca'), \
+                patch('platform.system', return_value="Windows"):
             cmd_slice(args)
 
         call_args = mock_run.call_args[0][0]
@@ -421,7 +418,7 @@ class TestBambuCmdSliceEdgeCases(unittest.TestCase):
 
         mock_exit.side_effect = SystemExit(1)
 
-        with patch('bambu_cli.bambu.ORCA_SLICER', '/tmp/missing_orca'):
+        with settings_ctx(orca_slicer='/tmp/missing_orca'):
             with self.assertRaises(SystemExit):
                 cmd_slice(args)
 
@@ -431,38 +428,36 @@ class TestBambuCmdSliceEdgeCases(unittest.TestCase):
     @patch('os.path.isdir')
     @patch('os.path.exists')
     @patch('bambu_cli.slicer.logger')
-    @patch('bambu_cli.bambu.PROFILES_DIR', '/tmp')
     def test_cmd_slice_discover_process_profile_branches(self, mock_logger, mock_exists, mock_isdir, mock_listdir):
         from bambu_cli.bambu import _discover_process_profile
         mock_isdir.return_value = True
-
-        mock_listdir.return_value = ["0.20mm Standard @BBL P1P.json"]
-
         quality_map = {"standard": "0.20mm Standard @BBL P1P"}
-        result = _discover_process_profile("standard", quality_map)
-        self.assertTrue("0.20mm Standard @BBL P1P.json" in result)
 
-        mock_listdir.return_value = ["0.20mm Extra @BBL P1P.json"]
+        with settings_ctx(profiles_dir='/tmp'):
+            mock_listdir.return_value = ["0.20mm Standard @BBL P1P.json"]
+            result = _discover_process_profile("standard", quality_map)
+            self.assertTrue("0.20mm Standard @BBL P1P.json" in result)
 
-        result = _discover_process_profile("missing", quality_map)
-        self.assertTrue("0.20mm Extra @BBL P1P.json" in result)
+            mock_listdir.return_value = ["0.20mm Extra @BBL P1P.json"]
+            result = _discover_process_profile("missing", quality_map)
+            self.assertTrue("0.20mm Extra @BBL P1P.json" in result)
 
-        # Test fallback to 0.20mm when requested layer height is not found
-        mock_listdir.return_value = ["0.20mm Extra @BBL P1P.json"]
-        result = _discover_process_profile("0.16mm", quality_map)
-        self.assertTrue("0.20mm Extra @BBL P1P.json" in result)
-        mock_logger.warning.assert_called_with("⚠️  Requested quality not found, using: 0.20mm Extra @BBL P1P.json")
+            # Test fallback to 0.20mm when requested layer height is not found
+            mock_listdir.return_value = ["0.20mm Extra @BBL P1P.json"]
+            result = _discover_process_profile("0.16mm", quality_map)
+            self.assertTrue("0.20mm Extra @BBL P1P.json" in result)
+            mock_logger.warning.assert_called_with("⚠️  Requested quality not found, using: 0.20mm Extra @BBL P1P.json")
 
-        # Test no slicer profiles found at all
-        mock_listdir.return_value = []
-        result = _discover_process_profile("standard", quality_map)
-        self.assertIsNone(result)
-        mock_logger.error.assert_called_with(f"No slicer profiles found in {os.path.join('/tmp', 'process')}")
+            # Test no slicer profiles found at all
+            mock_listdir.return_value = []
+            result = _discover_process_profile("standard", quality_map)
+            self.assertIsNone(result)
+            mock_logger.error.assert_called_with(f"No slicer profiles found in {os.path.join('/tmp', 'process')}")
 
-        # Test directory does not exist
-        mock_isdir.return_value = False
-        result = _discover_process_profile("standard", quality_map)
-        self.assertIsNone(result)
+            # Test directory does not exist
+            mock_isdir.return_value = False
+            result = _discover_process_profile("standard", quality_map)
+            self.assertIsNone(result)
 
     @patch('subprocess.Popen')
     @patch('bambu_cli.slicer._create_temp_profiles')
@@ -471,8 +466,6 @@ class TestBambuCmdSliceEdgeCases(unittest.TestCase):
     @patch('os.path.exists')
     @patch('os.makedirs', MagicMock())
     @patch('bambu_cli.slicer.logger')
-    @patch('bambu_cli.bambu.PROFILES_DIR', '/tmp')
-    @patch('bambu_cli.bambu.ORCA_SLICER', '/tmp/orca')
     def test_cmd_slice_error_message_parsing(self, mock_logger, mock_exists, mock_getsize, mock_unlink, mock_create, mock_run):
         from bambu_cli.bambu import cmd_slice
 
@@ -507,7 +500,8 @@ class TestBambuCmdSliceEdgeCases(unittest.TestCase):
         args.infill = 15
         args.pattern = "grid"
 
-        with patch('platform.system', return_value="Windows"):
+        with settings_ctx(profiles_dir='/tmp', orca_slicer='/tmp/orca'), \
+                patch('platform.system', return_value="Windows"):
             with self.assertRaises(SystemExit) as cm:
                 cmd_slice(args)
             self.assertEqual(cm.exception.code, 5)

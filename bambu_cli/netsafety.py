@@ -58,9 +58,9 @@ def _get_safe_connection(host, port, timeout, source_address):
             ip_obj = ipaddress.ip_address(ip)
             if isinstance(ip_obj, ipaddress.IPv6Address) and ip_obj.ipv4_mapped:
                 ip_obj = ip_obj.ipv4_mapped
-            from bambu_cli import bambu
+            from bambu_cli.context import current_settings
 
-            if not getattr(bambu, "ALLOW_PRIVATE_IPS", False) and not ip_obj.is_global:
+            if not current_settings().allow_private_ips and not ip_obj.is_global:
                 logger.warning(f"Security Error: Refusing connection to non-public IP ({ip}) for {host}")
                 continue
         except ValueError:

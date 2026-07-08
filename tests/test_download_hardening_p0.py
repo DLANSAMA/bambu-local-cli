@@ -99,8 +99,7 @@ def test_redirect_to_private_ip_blocked(tmp_path):
     same as the initial hop (per-hop SSRF check via _get_safe_connection)."""
     addr_info = [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("10.0.0.5", 443))]
     download._dns_cache.clear()
-    with patch.object(download.socket, "getaddrinfo", return_value=addr_info), \
-         patch.object(bambu, "ALLOW_PRIVATE_IPS", False):
+    with patch.object(download.socket, "getaddrinfo", return_value=addr_info):
         with pytest.raises(urllib.error.URLError):
             download._get_safe_connection("internal.example.com", 443, 5, None)
     download._dns_cache.clear()

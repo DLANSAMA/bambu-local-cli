@@ -15,6 +15,7 @@ from unittest.mock import patch
 import bambu_cli.config as config
 import bambu_cli.setup_cmd as setup_cmd
 from bambu_cli import bambu
+from tests.bambu_test_base import config_ctx
 
 
 class ResetWarnFlagMixin:
@@ -22,29 +23,26 @@ class ResetWarnFlagMixin:
         super().setUp()
         self._orig_warned = config._INLINE_ACCESS_CODE_WARNED
         config._INLINE_ACCESS_CODE_WARNED = False
-        self._orig_cfg = dict(bambu._cfg) if bambu._cfg else {}
 
     def tearDown(self):
         config._INLINE_ACCESS_CODE_WARNED = self._orig_warned
-        bambu._cfg = self._orig_cfg
         super().tearDown()
 
 
 class TestInlineAccessCodeWarning(ResetWarnFlagMixin, unittest.TestCase):
     def test_warns_once_when_inline_only(self):
-        bambu._cfg = {"access_code": "SECRET123"}
-        with self.assertLogs("bambu", level="WARNING") as cm:
-            config.load_access_code()
-            config.load_access_code()
+        with config_ctx({"access_code": "SECRET123"}):
+            with self.assertLogs("bambu", level="WARNING") as cm:
+                config.load_access_code()
+                config.load_access_code()
         warnings = [line for line in cm.output if "inline access_code" in line]
         self.assertEqual(len(warnings), 1)
         self.assertNotIn("SECRET123", "\n".join(cm.output))
 
     def test_no_warning_when_access_code_file_used(self):
-        bambu._cfg = {"access_code_file_marker": True}
-        with patch("bambu_cli.cli._expand_path", return_value="/tmp/does-not-matter"), \
+        with config_ctx({"access_code_file": "/tmp/does-not-matter"}), \
+             patch("bambu_cli.cli._expand_path", return_value="/tmp/does-not-matter"), \
              patch("builtins.open", side_effect=lambda *a, **k: _fake_file("filecode\n")):
-            bambu._cfg = {"access_code_file": "/tmp/does-not-matter"}
             # assertNoLogs needs Python 3.10+; assert via the logger mock instead.
             with patch.object(config.logger, "warning") as mock_warn:
                 config.load_access_code()
@@ -53,18 +51,18 @@ class TestInlineAccessCodeWarning(ResetWarnFlagMixin, unittest.TestCase):
     def test_no_warning_when_both_inline_and_file_present(self):
         # access_code branch is checked first, but if access_code_file is also
         # configured we should not nag about migrating (nothing to migrate to).
-        bambu._cfg = {"access_code": "SECRET123", "access_code_file": "/tmp/somewhere"}
-        with patch.object(config.logger, "warning") as mock_warn:
-            config.load_access_code()
+        with config_ctx({"access_code": "SECRET123", "access_code_file": "/tmp/somewhere"}):
+            with patch.object(config.logger, "warning") as mock_warn:
+                config.load_access_code()
         mock_warn.assert_not_called()
 
     def test_no_warning_with_no_config(self):
-        # Simulation / no-config: _cfg empty, neither key present -> error path,
+        # Simulation / no-config: empty config, neither key present -> error path,
         # not the deprecation warning.
-        bambu._cfg = {}
-        with self.assertRaises(SystemExit):
-            with patch.object(config.logger, "warning") as mock_warn:
-                config.load_access_code()
+        with config_ctx({}):
+            with self.assertRaises(SystemExit):
+                with patch.object(config.logger, "warning") as mock_warn:
+                    config.load_access_code()
         mock_warn.assert_not_called()
 
 

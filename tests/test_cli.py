@@ -14,7 +14,9 @@ class TestCli(unittest.TestCase):
 
 class TestConfig(unittest.TestCase):
     def test_expected_fingerprint(self):
-        from bambu_cli import bambu; bambu._cfg = {}; self.assertIsNone(config._expected_fingerprint())
+        from tests.bambu_test_base import config_ctx
+        with config_ctx({}):
+            self.assertIsNone(config._expected_fingerprint())
         
 class TestSlicer(unittest.TestCase):
     def test_slicer_module(self):

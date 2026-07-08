@@ -23,6 +23,8 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
+from tests.bambu_test_base import settings_ctx
+
 # paho-mqtt is an optional/heavy dep; stub it the same way the main suite does so
 # importing the package never fails on environments without it installed.
 _mock_mqtt = MagicMock()
@@ -126,8 +128,7 @@ def test_a_benign_gl_noise_nonzero_is_success():
              patch.object(slicer, "_validate_slice_options", return_value=None), \
              patch.object(slicer.os.path, "exists", return_value=True), \
              patch.object(slicer.os.path, "getsize", return_value=4100), \
-             patch.object(bambu, "ORCA_SLICER", "/usr/bin/true"), \
-             patch.object(bambu, "PROFILES_DIR", tmpdir):
+             settings_ctx(orca_slicer="/usr/bin/true", profiles_dir=tmpdir):
             result = slicer.cmd_slice(args)
 
         assert result == outpath, "benign GL-noise non-zero exit should be treated as success"
@@ -160,8 +161,7 @@ def test_a_real_error_still_fails():
              patch.object(slicer, "_create_temp_profiles", return_value=(tmp_proc, tmp_fil)), \
              patch.object(slicer, "_validate_slice_options", return_value=None), \
              patch.object(slicer.os.path, "exists", side_effect=exists_side_effect), \
-             patch.object(bambu, "ORCA_SLICER", "/usr/bin/true"), \
-             patch.object(bambu, "PROFILES_DIR", tmpdir):
+             settings_ctx(orca_slicer="/usr/bin/true", profiles_dir=tmpdir):
             with pytest.raises(SystemExit) as excinfo:
                 slicer.cmd_slice(args)
 
@@ -244,7 +244,6 @@ def test_d_snapshot_uses_direct_grab_not_docker():
 
         with patch.object(bambu, "_grab_camera_frame_direct", return_value=jpeg), \
              patch.object(bambu, "load_access_code", return_value="ACODE"), \
-             patch.object(bambu, "PRINTER_IP", "192.168.1.50"), \
              patch.object(bambu.subprocess, "run") as mock_run, \
              patch.object(bambu.shutil, "which", return_value="/usr/bin/docker"):
             bambu._cmd_snapshot(args)
@@ -273,8 +272,7 @@ def test_get_safe_connection_blocks_private_ip():
     from bambu_cli import download
 
     addr_info = [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("192.168.1.5", 80))]
-    with patch.object(download.socket, "getaddrinfo", return_value=addr_info), \
-         patch.object(bambu, "ALLOW_PRIVATE_IPS", False):
+    with patch.object(download.socket, "getaddrinfo", return_value=addr_info):
         download._dns_cache.clear()
         with pytest.raises(urllib.error.URLError):
             download._get_safe_connection("evil.example.com", 80, 5, None)

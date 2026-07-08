@@ -34,18 +34,80 @@ import shutil
 
 mock_config_dir = tempfile.mkdtemp()
 mock_config_path = os.path.join(mock_config_dir, "config.json")
+_BASELINE_CONFIG = {
+    "printer_ip": "127.0.0.1",
+    "serial": "MOCK_SERIAL",
+    "access_code": "MOCK_CODE",
+    "orca_slicer": "/tmp/mock_orca",
+    "profiles_dir": "/tmp/mock_profiles",
+}
 with open(mock_config_path, "w", encoding="utf-8") as f:
-    json.dump({
-        "printer_ip": "127.0.0.1",
-        "serial": "MOCK_SERIAL",
-        "access_code": "MOCK_CODE",
-        "orca_slicer": "/tmp/mock_orca",
-        "profiles_dir": "/tmp/mock_profiles"
-    }, f)
+    json.dump(_BASELINE_CONFIG, f)
 
 import bambu_cli.bambu as bambu
 bambu.CONFIG_PATH = mock_config_path
+
+from bambu_cli import context as _context
+from bambu_cli.context import RuntimeContext as _RuntimeContext
+from bambu_cli.context import Settings as _Settings
+
+
+def install_baseline_context():
+    """Install the RuntimeContext every test starts from (mirrors the mock config).
+
+    Config state now lives on the process-wide RuntimeContext rather than
+    module globals, so tests establish (and reset to) this baseline instead of
+    relying on globals that persist across tests.
+    """
+    _context.set_current(
+        _RuntimeContext(
+            settings=_Settings.from_config(_BASELINE_CONFIG),
+            config=dict(_BASELINE_CONFIG),
+        )
+    )
+
+
 bambu.load_config(exit_on_fail=False)
+install_baseline_context()
+
+import contextlib as _contextlib
+from dataclasses import replace as _replace
+
+
+@_contextlib.contextmanager
+def config_ctx(cfg):
+    """Temporarily install a RuntimeContext built from the given raw config dict.
+
+    Replaces the old ``patch.dict(bambu._cfg, ...)`` idiom now that config
+    state lives on the RuntimeContext.
+    """
+    prev = _context.get_current()
+    try:
+        _context.set_current(
+            _RuntimeContext(settings=_Settings.from_config(cfg), config=dict(cfg))
+        )
+        yield
+    finally:
+        _context.set_current(prev)
+
+
+@_contextlib.contextmanager
+def settings_ctx(simulation=None, **setting_overrides):
+    """Temporarily install a RuntimeContext with specific Settings overrides.
+
+    Replaces the old ``patch('bambu_cli.bambu.PROFILES_DIR', ...)`` idiom.
+    ``simulation`` overrides the sim flag; keyword args override Settings fields.
+    """
+    prev = _context.get_current()
+    new_settings = _replace(prev.settings, **setting_overrides) if setting_overrides else prev.settings
+    sim = prev.simulation if simulation is None else simulation
+    try:
+        _context.set_current(
+            _RuntimeContext(settings=new_settings, config=prev.config, simulation=sim)
+        )
+        yield
+    finally:
+        _context.set_current(prev)
 
 def cleanup_mock_config():
     shutil.rmtree(mock_config_dir, ignore_errors=True)
@@ -67,7 +129,7 @@ from bambu_cli.printer import BambuPrinter
 
 def _test_printer(ip='192.168.1.1', serial=None, access_code='MOCK_CODE', **kwargs):
     """Build a BambuPrinter matching the mocked global config for direct protocol calls."""
-    return BambuPrinter(ip=ip, serial=serial or bambu.SERIAL, access_code=access_code, **kwargs)
+    return BambuPrinter(ip=ip, serial=serial or _context.current_settings().serial, access_code=access_code, **kwargs)
 
 
 def _setup_slice_proc(mock_proc, returncode=0, stdout=b"", stderr=b""):
@@ -85,4 +147,4 @@ def _setup_slice_proc(mock_proc, returncode=0, stdout=b"", stderr=b""):
 
 
 
-__all__ = [name for name in ('unittest', 'sys', 'io', 'json', 'os', 'platform', 'patch', 'MagicMock', 'mock_open', 'ANY', '_HOST_SYSTEM', 'mock_mqtt', 'tempfile', 'atexit', 'shutil', 'mock_config_dir', 'mock_config_path', 'bambu', 'cmd_stop', 'get_ftp', 'load_config', 'create_mqtt_client', 'cmd_light', 'execute_print_command', 'setup_logging', 'ssl', 'socket', 'urllib', 'BambuPrinter', '_test_printer', '_setup_slice_proc') if name in globals()]
+__all__ = [name for name in ('unittest', 'sys', 'io', 'json', 'os', 'platform', 'patch', 'MagicMock', 'mock_open', 'ANY', '_HOST_SYSTEM', 'mock_mqtt', 'tempfile', 'atexit', 'shutil', 'mock_config_dir', 'mock_config_path', 'bambu', 'cmd_stop', 'get_ftp', 'load_config', 'create_mqtt_client', 'cmd_light', 'execute_print_command', 'setup_logging', 'ssl', 'socket', 'urllib', 'BambuPrinter', '_test_printer', '_setup_slice_proc', 'install_baseline_context', 'config_ctx', 'settings_ctx') if name in globals()]

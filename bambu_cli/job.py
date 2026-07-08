@@ -352,7 +352,7 @@ def _cmd_job(args):
     """Public entry point shim: builds a RuntimeContext/JobSteps and delegates."""
     from bambu_cli.context import RuntimeContext
 
-    return _run_job(RuntimeContext.from_globals(args), args, JobSteps())
+    return _run_job(RuntimeContext.for_request(args), args, JobSteps())
 
 
 def _run_job(ctx, args, steps=None):

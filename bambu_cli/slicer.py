@@ -198,9 +198,9 @@ def _discover_process_profile(
 ) -> str | None:
     """Discover a matching process profile."""
     if profiles_dir is None:
-        from bambu_cli.context import Settings
+        from bambu_cli.context import current_settings
 
-        profiles_dir = Settings.from_globals().profiles_dir
+        profiles_dir = current_settings().profiles_dir
     layer_height = (
         quality_arg
         if quality_arg.startswith("0.")
@@ -362,10 +362,10 @@ def cmd_slice(args: argparse.Namespace) -> str:
     from bambu_cli import bambu
     from bambu_cli.cli import _exit_code_from_system_exit, _namespace_get
     from bambu_cli.constants import EXIT_COMMAND_ERROR, EXIT_CONFIG_ERROR, EXIT_FILE_ERROR, EXIT_TIMEOUT
-    from bambu_cli.context import Settings
+    from bambu_cli.context import current_settings
     from bambu_cli.utils import emit_json, emit_json_error
 
-    settings = Settings.from_globals()
+    settings = current_settings()
     filepath = bambu._expand_path(args.file)
     source_filepath = filepath
     if filepath.startswith("-"):
