@@ -129,7 +129,7 @@ def test_mqtt_require_missing_dependency():
 
 
 def test_cmd_gcode_success():
-    args = Namespace(code="G28", json=False)
+    args = Namespace(code="G28", json=False, confirm=True)
     printer = MagicMock()
     printer.send_command.return_value = True
     with patch("bambu_cli.commands.RuntimeContext.for_request") as fr, patch(

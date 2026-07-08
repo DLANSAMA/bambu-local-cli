@@ -376,6 +376,7 @@ def build_parser():  # pragma: no cover -- argparse wiring; help smoke tests cov
 
     p_gc = sub.add_parser("gcode", parents=[get_global_parser()], help="Send raw G-code to printer")
     p_gc.add_argument("code", help="G-code command (e.g. 'M104 S220')")
+    p_gc.add_argument("--confirm", action="store_true", help="Confirm sending raw G-code to the printer")
 
     p_dl = sub.add_parser("download", parents=[get_global_parser()], help="Download model/print file from URL")
     p_dl.add_argument("url", help="Printables page, simple HTML page, direct model/print URL, or ZIP URL")

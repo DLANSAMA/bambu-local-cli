@@ -35,6 +35,7 @@ from bambu_cli.download.naming import (  # noqa: F401
     _download_target_filename,
     _file_extension,
     _filename_from_content_disposition,
+    _has_command_injection_chars,
     _is_print_ready_name,
     _name_for_message,
     _portable_basename,

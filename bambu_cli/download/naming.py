@@ -97,6 +97,16 @@ def _filename_from_content_disposition(value):  # pragma: no cover -- naming hel
     return _sanitize_download_filename(filename) if filename else None
 
 
+def _has_command_injection_chars(value):  # pragma: no cover -- naming helper
+    """True if *value* contains CR, LF, or NUL.
+
+    FTP and MQTT command lines are delimited by these characters; embedding them
+    in a filename or G-code payload can smuggle a second command. Shared by
+    ``_safe_remote_name`` and ``cmd_gcode`` validation.
+    """
+    return any(c in (value or "") for c in ("\r", "\n", "\0"))
+
+
 def _safe_remote_name(filename):  # pragma: no cover -- naming helper
     """Reject names that are unsafe for printer-side files.
 
@@ -111,7 +121,7 @@ def _safe_remote_name(filename):  # pragma: no cover -- naming helper
         return None
     if filename != _portable_basename(filename):
         return None
-    if any(c in filename for c in ("\r", "\n", "\0")):
+    if _has_command_injection_chars(filename):
         return None
     if any(c in filename for c in '<>:"/\\|?*'):
         return None
