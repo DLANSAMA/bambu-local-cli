@@ -58,6 +58,25 @@ bambu-cli job "https://www.printables.com/model/12345-thing" --confirm --json
 
 For programmatic checks, `bambu-cli --json --version` emits JSON version details.
 
+### Monitoring a print
+
+`bambu-cli status --monitor` (alias `--wait`) follows a print until it reaches a
+terminal state (`FINISH`, `FAILED`, `STOP`, or `IDLE`). For a human it renders a
+live progress bar; for an agent, add `--json` to stream **newline-delimited
+JSON** (NDJSON) — one compact object per change as the print advances:
+
+```bash
+bambu-cli status --monitor --json
+```
+```json
+{"event":"update","command":"status","gcode_state":"RUNNING","mc_percent":42,"layer_num":50,"total_layer_num":200,"mc_remaining_time":33,"nozzle_temper":220,"nozzle_target_temper":220,"bed_temper":60,"bed_target_temper":60,"gcode_file":"model.gcode"}
+{"event":"terminal","command":"status","gcode_state":"FINISH","mc_percent":100,"layer_num":200,"total_layer_num":200,"mc_remaining_time":0,"nozzle_temper":38,"nozzle_target_temper":0,"bed_temper":31,"bed_target_temper":0,"gcode_file":"model.gcode"}
+```
+
+Each line is a self-contained JSON object, so an agent can consume the stream
+incrementally and stop once it sees `"event":"terminal"`. Pair with `--sim` to
+exercise the exact event shape without a printer.
+
 ### Global flags
 
 | Flag | Description |

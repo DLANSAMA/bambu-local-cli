@@ -895,5 +895,61 @@ class TestBambuUploadRetry(unittest.TestCase):
         self.assertTrue(any("✅ Uploaded test.3mf to printer" in call[0][0] for call in mock_logger.info.call_args_list))
 
 
+class TestMonitorStatusStreaming(unittest.TestCase):
+    """`status --monitor --json` streams one NDJSON event per change (agent contract)."""
+
+    def test_status_event_shape_and_coercion(self):
+        from bambu_cli.protocols.mqtt import _status_event
+
+        p = {
+            "gcode_state": "RUNNING",
+            "mc_percent": "42",           # firmware sometimes sends numbers as strings
+            "layer_num": 10,
+            "total_layer_num": 200,
+            "mc_remaining_time": "33",
+            "nozzle_temper": 220,
+            "bed_temper": 60,
+            "gcode_file": "model.gcode",
+        }
+        ev = _status_event(p, "update")
+        self.assertEqual(ev["event"], "update")
+        self.assertEqual(ev["command"], "status")
+        self.assertEqual(ev["gcode_state"], "RUNNING")
+        self.assertEqual(ev["mc_percent"], 42)          # coerced to int
+        self.assertEqual(ev["mc_remaining_time"], 33)   # coerced to int
+        self.assertEqual(ev["layer_num"], 10)
+        self.assertEqual(ev["total_layer_num"], 200)
+        self.assertEqual(ev["gcode_file"], "model.gcode")
+        # Missing/garbage numeric fields degrade to 0 rather than raising.
+        self.assertEqual(_status_event({}, "update")["mc_percent"], 0)
+        self.assertEqual(_status_event({"mc_percent": "?"}, "update")["mc_percent"], 0)
+
+    def test_sim_monitor_streams_ndjson_events(self):
+        import contextlib
+        import io
+        import json
+        import types
+
+        from bambu_cli.protocols import mqtt
+
+        args = types.SimpleNamespace(json=True, monitor=True, sim=True)
+        with settings_ctx(simulation=True), patch.object(mqtt.time, "sleep"):
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                mqtt.monitor_status(args)
+
+        events = [json.loads(line) for line in buf.getvalue().splitlines() if line.strip()]
+        self.assertEqual(
+            [(e["event"], e["gcode_state"], e["mc_percent"]) for e in events],
+            [("update", "PREPARE", 0), ("update", "RUNNING", 50), ("terminal", "FINISH", 100)],
+        )
+        # Every streamed line is a self-contained one-line JSON object (NDJSON).
+        for line in buf.getvalue().splitlines():
+            if line.strip():
+                self.assertNotIn("\n", line)
+                obj = json.loads(line)
+                self.assertEqual(obj["command"], "status")
+
+
 if __name__ == '__main__':
     unittest.main()
