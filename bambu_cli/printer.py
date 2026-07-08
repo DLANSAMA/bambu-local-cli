@@ -232,17 +232,19 @@ class BambuPrinter:
 
 
 def get_printer() -> BambuPrinter:
-    """Factory method to get a BambuPrinter instance based on current global config."""
+    """Factory: build a BambuPrinter from the active run's settings."""
     from bambu_cli import bambu
+    from bambu_cli.context import _normalize_fingerprint, current_settings, current_simulation
 
-    simulation_mode = bambu.SIMULATION_MODE
+    settings = current_settings()
+    simulation_mode = current_simulation()
     return BambuPrinter(
-        ip=bambu.PRINTER_IP,
-        serial=bambu.SERIAL,
+        ip=settings.printer_ip,
+        serial=settings.serial,
         # Simulation mode never talks to a real printer, so it must not
         # require credentials (load_access_code exits when unconfigured).
         access_code="" if simulation_mode else bambu.load_access_code(),
-        insecure_tls=bambu.INSECURE_TLS,
-        cert_fingerprint=bambu._expected_fingerprint(),
+        insecure_tls=settings.insecure_tls,
+        cert_fingerprint=_normalize_fingerprint(settings.cert_fingerprint),
         simulation_mode=simulation_mode,
     )

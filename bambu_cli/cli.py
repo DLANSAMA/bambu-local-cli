@@ -538,15 +538,16 @@ def main():
 
     # Global settings validation
     if _requires_printer_dns_check(args):
-        if bambu.PRINTER_IP == "0.0.0.0":
+        printer_ip = _context.current_settings().printer_ip
+        if printer_ip == "0.0.0.0":
             message = "Printer IP is not configured. Please run setup first."
             logger.error(message)
             emit_json_error(args, args.cmd or "main", EXIT_CONFIG_ERROR, message, failed_step="config")
             sys.exit(EXIT_CONFIG_ERROR)
         try:
-            socket.getaddrinfo(bambu.PRINTER_IP, None)
+            socket.getaddrinfo(printer_ip, None)
         except socket.gaierror:
-            message = f"Invalid printer_ip or hostname in config: {bambu.PRINTER_IP}"
+            message = f"Invalid printer_ip or hostname in config: {printer_ip}"
             logger.error(message)
             emit_json_error(args, args.cmd or "main", EXIT_CONFIG_ERROR, message, failed_step="config")
             sys.exit(EXIT_CONFIG_ERROR)

@@ -54,7 +54,7 @@ def _file_permission_check(path, name):
 
 def collect_preflight_checks():
     """Collect local install/config checks without contacting the printer."""
-    from bambu_cli import bambu
+    from bambu_cli.context import current_config, current_settings
     from bambu_cli.protocols import mqtt as mqtt_protocol
     from bambu_cli.slicer import _slicer_executable_problem
 
@@ -159,15 +159,16 @@ def collect_preflight_checks():
             )
         )
 
-    cfg_for_paths = cfg or bambu._cfg or {}
-    orca_path = _expand_path(cfg_for_paths.get("orca_slicer", bambu.ORCA_SLICER))
+    settings = current_settings()
+    cfg_for_paths = cfg or current_config() or {}
+    orca_path = _expand_path(cfg_for_paths.get("orca_slicer", settings.orca_slicer))
     orca_problem = _slicer_executable_problem(orca_path)
     if not orca_problem:
         checks.append(_preflight_result("ok", "orca-slicer", f"OrcaSlicer found at {_display_path(orca_path)}."))
     else:
         checks.append(_preflight_result("error", "orca-slicer", orca_problem))
 
-    profiles_dir = _expand_path(cfg_for_paths.get("profiles_dir", bambu.PROFILES_DIR))
+    profiles_dir = _expand_path(cfg_for_paths.get("profiles_dir", settings.profiles_dir))
     if os.path.isdir(profiles_dir):
         checks.append(
             _preflight_result("ok", "profiles-dir", f"OrcaSlicer profiles found at {_display_path(profiles_dir)}.")

@@ -199,3 +199,31 @@ def set_current(ctx: RuntimeContext) -> None:
     """Set the process-wide current RuntimeContext."""
     global _current
     _current = ctx
+
+
+# --- Transition accessors (globals migration) -------------------------------
+# These are the single funnel through which handlers read runtime config during
+# the migration to a context source of truth. For now they read the still-live,
+# mirrored ``bambu.<NAME>`` globals fresh on every call, so patched globals are
+# honored and there is no singleton-caching leak between tests. At flag day
+# (Stage 4) their bodies flip to read the installed RuntimeContext and the
+# module globals are deleted — no caller changes required.
+
+
+def current_settings() -> Settings:
+    """Typed settings for the active run."""
+    return Settings.from_globals()
+
+
+def current_config() -> dict[str, Any]:
+    """Raw config dict for the active run."""
+    from bambu_cli import bambu
+
+    return dict(getattr(bambu, "_cfg", None) or {})
+
+
+def current_simulation() -> bool:
+    """Whether the active run is in simulation mode."""
+    from bambu_cli import bambu
+
+    return bool(getattr(bambu, "SIMULATION_MODE", False))
