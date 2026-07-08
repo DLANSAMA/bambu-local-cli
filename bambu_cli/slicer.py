@@ -505,7 +505,7 @@ def cmd_slice(args: argparse.Namespace) -> str:
             detected_orca = detect_orca_slicer()
             if detected_orca and detected_orca != settings.orca_slicer:
                 logger.info(
-                    f'Detected OrcaSlicer at {bambu._display_path(detected_orca)} — '
+                    f"Detected OrcaSlicer at {bambu._display_path(detected_orca)} — "
                     'set "orca_slicer" to this in config.json.'
                 )
             else:

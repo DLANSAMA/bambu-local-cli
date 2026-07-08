@@ -184,7 +184,9 @@ def collect_preflight_checks():
         message = f"OrcaSlicer BBL profiles not found at {_display_path(profiles_dir)}."
         detected_profiles = detect_profiles_dir()
         if detected_profiles and detected_profiles != profiles_dir:
-            message += f' Detected profiles at {_display_path(detected_profiles)} — set "profiles_dir" to this in config.json.'
+            message += (
+                f' Detected profiles at {_display_path(detected_profiles)} — set "profiles_dir" to this in config.json.'
+            )
         checks.append(_preflight_result("error", "profiles-dir", message))
 
     if shutil.which("gmsh"):
