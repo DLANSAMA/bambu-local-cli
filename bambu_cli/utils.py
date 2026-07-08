@@ -118,6 +118,18 @@ def emit_json(data):
     print(json.dumps(_json_display_paths(data), indent=2))
 
 
+def emit_json_line(data):
+    """Emit one compact JSON object on its own line (NDJSON).
+
+    Used for streaming output (e.g. ``status --monitor --json``) where an agent
+    consumes one event per line as they arrive, rather than a single pretty
+    document at the end.
+    """
+    global _JSON_EMITTED
+    _JSON_EMITTED = True
+    print(json.dumps(_json_display_paths(data), separators=(",", ":")), flush=True)
+
+
 def _namespace_get(args, key, default=None):
     return getattr(args, key, default)
 

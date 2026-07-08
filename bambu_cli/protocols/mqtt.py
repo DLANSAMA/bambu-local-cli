@@ -365,37 +365,67 @@ def get_version(printer, timeout=5, retries=1):
 
 
 @mockable
+def _status_event(p, event):
+    """Build a compact, agent-friendly status event from a raw MQTT print payload.
+
+    ``event`` is ``"update"`` for an in-progress change or ``"terminal"`` for the
+    final state. Only the fields agents care about for print progress are kept,
+    so a streamed line stays small.
+    """
+
+    def _int(value, default=0):
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return default
+
+    return {
+        "event": event,
+        "command": "status",
+        "gcode_state": p.get("gcode_state", "UNKNOWN"),
+        "mc_percent": _int(p.get("mc_percent", 0)),
+        "layer_num": _int(p.get("layer_num", 0)),
+        "total_layer_num": _int(p.get("total_layer_num", 0)),
+        "mc_remaining_time": _int(p.get("mc_remaining_time", 0)),
+        "nozzle_temper": p.get("nozzle_temper"),
+        "nozzle_target_temper": p.get("nozzle_target_temper"),
+        "bed_temper": p.get("bed_temper"),
+        "bed_target_temper": p.get("bed_target_temper"),
+        "gcode_file": p.get("gcode_file", ""),
+    }
+
+
 def monitor_status(args):
-    """Subscribe to the printer's report topic and log updates until a terminal state is reached."""
+    """Subscribe to the printer's report topic and stream updates until a terminal state.
+
+    In ``--json`` mode each change is emitted as one compact NDJSON line (an
+    ``event: "update"`` object, then a final ``event: "terminal"``) so an agent
+    can follow a print in real time. Otherwise a live human-readable progress
+    bar is shown.
+    """
     from bambu_cli.cli import _namespace_get
     from bambu_cli.printer import get_printer
-    from bambu_cli.utils import emit_json
+    from bambu_cli.utils import emit_json_line
 
     printer = get_printer()
+    json_mode = bool(_namespace_get(args, "json", False))
     logger.info("📡 Starting status monitor loop. Press Ctrl+C to stop.")
     if printer.simulation_mode:
-        logger.info("🤖 [SIM] Simulated status: State=PREPARE, Progress=0%")
-        time.sleep(0.5)
-        logger.info("🤖 [SIM] Simulated status: State=RUNNING, Progress=50%")
-        time.sleep(0.5)
-        logger.info("🤖 [SIM] Simulated status: State=FINISH, Progress=100%")
-        logger.info("🏁 Reached terminal state: FINISH")
-        if bool(_namespace_get(args, "json", False)):
-            emit_json(
-                {
-                    "status": "ok",
-                    "command": "status",
-                    "printer": {
-                        "gcode_state": "FINISH",
-                        "mc_percent": 100,
-                    },
-                }
-            )
+        # Stream the same shape of events a real print would, so agents can
+        # exercise the --monitor --json contract without hardware.
+        for state, pct, event in (("PREPARE", 0, "update"), ("RUNNING", 50, "update"), ("FINISH", 100, "terminal")):
+            if json_mode:
+                emit_json_line(_status_event({"gcode_state": state, "mc_percent": pct}, event))
+            else:
+                logger.info(f"🤖 [SIM] Simulated status: State={state}, Progress={pct}%")
+            if event != "terminal":
+                time.sleep(0.5)
+        if not json_mode:
+            logger.info("🏁 Reached terminal state: FINISH")
         return
 
     terminal_states = {"FINISH", "FAILED", "STOP", "IDLE"}
     received_terminal = threading.Event()
-    json_mode = bool(_namespace_get(args, "json", False))
     show_progress_bar = not json_mode and sys.stdout.isatty()
     client = create_mqtt_client(printer)
     userdata = {}
@@ -446,6 +476,8 @@ def monitor_status(args):
 
                     if userdata.get("progress"):
                         userdata["progress"].update(userdata["task_id"], completed=pct, description=f"State: {state}")
+                    elif json_mode:
+                        emit_json_line(_status_event(p, "update"))
                     else:
                         logger.info(f"⏳ Status: State={state}, Progress={pct}%")
 
@@ -453,15 +485,10 @@ def monitor_status(args):
                     last_pct[0] = pct
 
                 if state in terminal_states:
-                    logger.info(f"🏁 Reached terminal state: {state}")
-                    if bool(_namespace_get(args, "json", False)):
-                        emit_json(
-                            {
-                                "status": "ok",
-                                "command": "status",
-                                "printer": p,
-                            }
-                        )
+                    if json_mode:
+                        emit_json_line(_status_event(p, "terminal"))
+                    else:
+                        logger.info(f"🏁 Reached terminal state: {state}")
                     received_terminal.set()
         except (UnicodeDecodeError, json.JSONDecodeError) as e:
             logger.debug(f"MQTT decode error: {e}")
