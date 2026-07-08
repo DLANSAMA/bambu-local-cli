@@ -185,5 +185,6 @@ jobs:
           fi
       - name: security + contract markers smoke
         run: |
+          uv sync --frozen
           uv pip install '.[test]'
           uv run python -m pytest tests/ -q -m "security or contract" --tb=line
