@@ -14,7 +14,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ### Added
 - PyPI trusted publishing on tagged releases (`v*`).
-- `CHANGELOG.md`, `CONTRIBUTING.md`, Changelog project URL.
+- `CHANGELOG.md`, `CONTRIBUTING.md`, `SECURITY.md`, Changelog project URL.
 
 ## [0.1.0] - unreleased
 
