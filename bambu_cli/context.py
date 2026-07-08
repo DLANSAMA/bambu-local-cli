@@ -13,7 +13,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from bambu_cli.printer import BambuPrinter
 
 
 def _normalize_fingerprint(fp: str | None) -> str | None:
@@ -36,6 +39,7 @@ class Settings:
 
     printer_ip: str = "0.0.0.0"
     serial: str = "UNKNOWN"
+    username: str = "bblp"
     mqtt_port: int = 8883
     insecure_tls: bool = False
     cert_fingerprint: str | None = None
@@ -79,6 +83,7 @@ class Settings:
         return cls(
             printer_ip=cfg.get("printer_ip", "0.0.0.0"),
             serial=cfg.get("serial", "UNKNOWN"),
+            username=cfg.get("username", "bblp"),
             mqtt_port=cfg.get("mqtt_port", 8883),
             insecure_tls=cfg.get("insecure_tls", False),
             cert_fingerprint=cfg.get("cert_fingerprint"),
@@ -98,14 +103,14 @@ class Settings:
         """Snapshot the current ``bambu.<NAME>`` module globals."""
         from bambu_cli import bambu
 
+        cfg = getattr(bambu, "_cfg", None) or {}
         return cls(
             printer_ip=bambu.PRINTER_IP,
             serial=bambu.SERIAL,
+            username=cfg.get("username", "bblp"),
             mqtt_port=bambu.MQTT_PORT,
             insecure_tls=bambu.INSECURE_TLS,
-            cert_fingerprint=getattr(bambu, "_cfg", {}).get("cert_fingerprint")
-            if getattr(bambu, "_cfg", None)
-            else None,
+            cert_fingerprint=cfg.get("cert_fingerprint"),
             orca_slicer=bambu.ORCA_SLICER,
             profiles_dir=bambu.PROFILES_DIR,
             printer_model=bambu.PRINTER_MODEL,
@@ -127,13 +132,14 @@ class RuntimeContext:
     """
 
     settings: Settings = field(default_factory=Settings)
+    config: dict[str, Any] = field(default_factory=dict)
     simulation: bool = False
     json_mode: bool = False
     config_path: Path | None = None
     last_error: dict | None = None
     _printer: Any = field(default=None, repr=False, compare=False)
 
-    def printer(self):
+    def printer(self) -> BambuPrinter:
         """Return a cached ``BambuPrinter`` built from ``self.settings``.
 
         Mirrors ``bambu_cli.printer.get_printer()``: empty access_code in
@@ -157,7 +163,7 @@ class RuntimeContext:
         return self._printer
 
     @classmethod
-    def from_globals(cls, args=None) -> RuntimeContext:
+    def from_globals(cls, args: Any = None) -> RuntimeContext:
         """Snapshot the current globals into a RuntimeContext."""
         from bambu_cli import bambu
 
@@ -169,6 +175,7 @@ class RuntimeContext:
 
         return cls(
             settings=Settings.from_globals(),
+            config=dict(getattr(bambu, "_cfg", None) or {}),
             simulation=bool(getattr(bambu, "SIMULATION_MODE", False)),
             json_mode=json_mode,
         )
