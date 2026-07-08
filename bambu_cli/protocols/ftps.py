@@ -109,6 +109,12 @@ class ImplicitFTPS(ftplib.FTP_TLS):
             if pin:
                 actual = hashlib.sha256(conn.getpeercert(binary_form=True)).hexdigest().lower()
                 if actual != pin.lower():
+                    # Close the data socket before re-raising so a pin mismatch
+                    # does not leak the FD (no try/finally around wrap otherwise).
+                    try:
+                        conn.close()
+                    except OSError:
+                        pass
                     raise ssl.SSLError(f"Certificate fingerprint mismatch: expected {pin.lower()}, got {actual}")
             # Bambu firmware never answers the TLS close-notify on the data
             # channel, so ftplib's storbinary/retrbinary hang in
