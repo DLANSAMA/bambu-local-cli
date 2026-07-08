@@ -12,6 +12,7 @@ from bambu_cli.protocols import mqtt as mqtt_protocol
 
 logger = logging.getLogger("bambu.printer")
 
+
 class BambuPrinter:
     """
     A unified client for communicating with a Bambu Lab 3D printer over local network (MQTT & FTPS).
@@ -74,7 +75,7 @@ class BambuPrinter:
 
     def _backoff_delay(self, attempt: int) -> float:
         """Exponential backoff with jitter, in seconds."""
-        base = min(5 * (2 ** attempt), 30)
+        base = min(5 * (2**attempt), 30)
         return base + random.uniform(0, base * 0.25)
 
     def _delete_remote_quiet(self, ftp, remote_path: str) -> None:
@@ -83,7 +84,15 @@ class BambuPrinter:
         except ftplib.all_errors:
             pass
 
-    def upload_file(self, local_path: str, remote_path: str, timeout: Optional[float] = None, progress_callback=None, on_resume=None, sleep=time.sleep) -> bool:
+    def upload_file(
+        self,
+        local_path: str,
+        remote_path: str,
+        timeout: Optional[float] = None,
+        progress_callback=None,
+        on_resume=None,
+        sleep=time.sleep,
+    ) -> bool:
         """Upload a file via FTPS as a verified state machine: (fresh|probe) -> (resume|restart) -> transfer -> verify."""
         filesize = os.path.getsize(local_path)
         max_retries = 3
@@ -95,14 +104,20 @@ class BambuPrinter:
                 with self.get_ftp_client(timeout=timeout or self.ftps_timeout) as ftp:
                     if attempt == 0:
                         self._delete_remote_quiet(ftp, remote_path)
-                    with open(local_path, 'rb') as f:
+                    with open(local_path, "rb") as f:
                         if uploaded_bytes > 0:
                             logger.info(f"🔄 Resuming from {uploaded_bytes // 1024}KB...")
                             if on_resume:
                                 on_resume(uploaded_bytes)
                             f.seek(uploaded_bytes)
                         attempted_transfer = True
-                        ftp.storbinary(f'STOR {remote_path}', f, blocksize=1048576, rest=uploaded_bytes if uploaded_bytes > 0 else None, callback=progress_callback)
+                        ftp.storbinary(
+                            f"STOR {remote_path}",
+                            f,
+                            blocksize=1048576,
+                            rest=uploaded_bytes if uploaded_bytes > 0 else None,
+                            callback=progress_callback,
+                        )
 
                     # Transfer completed without raising; verify before trusting it.
                     remote_size = self._probe_remote_size(ftp, remote_path)
@@ -116,7 +131,9 @@ class BambuPrinter:
 
                     # Sizes disagree even though STOR didn't raise; treat as a failed
                     # attempt and retry rather than declaring success on garbage data.
-                    logger.warning(f"⚠️ Upload attempt {attempt + 1} failed: size mismatch (remote {remote_size}, expected {filesize})")
+                    logger.warning(
+                        f"⚠️ Upload attempt {attempt + 1} failed: size mismatch (remote {remote_size}, expected {filesize})"
+                    )
                     if remote_size < filesize:
                         uploaded_bytes = remote_size
                     else:
@@ -150,7 +167,9 @@ class BambuPrinter:
                             if remote_size is not None:
                                 if remote_size == filesize:
                                     if attempted_transfer:
-                                        logger.info(f"✅ Uploaded {remote_path} ({filesize // 1024}KB, verified remotely)")
+                                        logger.info(
+                                            f"✅ Uploaded {remote_path} ({filesize // 1024}KB, verified remotely)"
+                                        )
                                         return True
                                     # Same-size remote file but we haven't actually
                                     # transferred anything yet this run (e.g. the
@@ -174,13 +193,15 @@ class BambuPrinter:
                     return False
         return False
 
-    def download_file(self, remote_path: str, local_path: str, timeout: Optional[float] = None, progress_callback=None) -> bool:
+    def download_file(
+        self, remote_path: str, local_path: str, timeout: Optional[float] = None, progress_callback=None
+    ) -> bool:
         """Download a file via FTPS."""
         # Simple download implementation without resume for now
         try:
             with self.get_ftp_client(timeout=timeout or self.ftps_timeout) as ftp:
-                with open(local_path, 'wb') as f:
-                    ftp.retrbinary(f'RETR {remote_path}', f.write, blocksize=1048576)
+                with open(local_path, "wb") as f:
+                    ftp.retrbinary(f"RETR {remote_path}", f.write, blocksize=1048576)
                 return True
         except (*ftplib.all_errors, ssl.SSLError) as e:
             logger.error(f"Download failed: {e}")
@@ -196,7 +217,7 @@ class BambuPrinter:
             logger.error(f"Delete failed: {e}")
             return False
 
-    def list_files(self, remote_dir: str = '/model/', timeout: Optional[float] = None) -> Optional[list]:
+    def list_files(self, remote_dir: str = "/model/", timeout: Optional[float] = None) -> Optional[list]:
         """List files in a remote directory via FTPS."""
         try:
             with self.get_ftp_client(timeout=timeout or self.ftps_timeout) as ftp:
@@ -209,9 +230,11 @@ class BambuPrinter:
         """Get version info via MQTT."""
         return mqtt_protocol.get_version(self, timeout=timeout, retries=retries)
 
+
 def get_printer() -> BambuPrinter:
     """Factory method to get a BambuPrinter instance based on current global config."""
     from bambu_cli import bambu
+
     simulation_mode = bambu.SIMULATION_MODE
     return BambuPrinter(
         ip=bambu.PRINTER_IP,

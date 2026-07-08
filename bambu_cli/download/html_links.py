@@ -1,4 +1,5 @@
 """Direct model-file link extraction from generic HTML pages."""
+
 from html.parser import HTMLParser
 from urllib.parse import unquote, urljoin, urlparse
 
@@ -18,11 +19,20 @@ class _ModelLinkParser(HTMLParser):
     """Extract direct model/print links from simple HTML pages."""
 
     LINK_ATTRS = (
-        "href", "src", "data-url", "data-href", "data-download-url",
-        "data-file-url", "data-src",
+        "href",
+        "src",
+        "data-url",
+        "data-href",
+        "data-download-url",
+        "data-file-url",
+        "data-src",
     )
     FILENAME_HINT_ATTRS = (
-        "download", "filename", "data-filename", "data-file-name", "data-name",
+        "download",
+        "filename",
+        "data-filename",
+        "data-file-name",
+        "data-name",
     )
 
     def __init__(self, base_url):

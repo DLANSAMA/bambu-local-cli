@@ -1,4 +1,5 @@
 """Shared setup helpers: config path, secure writes, prompts, config building."""
+
 import getpass
 import json
 import os
@@ -15,6 +16,7 @@ from bambu_cli.utils import _secure_makedirs, emit_json_error
 def _config_path():
     """Read the config path through the bambu module so tests can patch it."""
     from bambu_cli import bambu
+
     return getattr(bambu, "CONFIG_PATH", CONFIG_PATH)
 
 
@@ -44,7 +46,7 @@ def _secure_write_json(path, data):
             os.chmod(expanded, 0o600)
         except OSError:
             pass
-    with open(os.open(expanded, os.O_CREAT | os.O_WRONLY | os.O_TRUNC, 0o600), 'w', encoding="utf-8") as f:
+    with open(os.open(expanded, os.O_CREAT | os.O_WRONLY | os.O_TRUNC, 0o600), "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
     try:
         os.chmod(expanded, 0o600)
@@ -62,7 +64,7 @@ def _secure_write_text(path, text):
             os.chmod(expanded, 0o600)
         except OSError:
             pass
-    with open(os.open(expanded, os.O_CREAT | os.O_WRONLY | os.O_TRUNC, 0o600), 'w', encoding="utf-8") as f:
+    with open(os.open(expanded, os.O_CREAT | os.O_WRONLY | os.O_TRUNC, 0o600), "w", encoding="utf-8") as f:
         f.write(text)
     try:
         os.chmod(expanded, 0o600)
@@ -80,7 +82,13 @@ def _default_access_code_file_path():
 
 def _prompt_text(prompt, args=None):
     if args and getattr(args, "json", False):
-        emit_json_error(args, "setup", EXIT_CONFIG_ERROR, "Interactive prompt required, but json mode is active", failed_step="validate")
+        emit_json_error(
+            args,
+            "setup",
+            EXIT_CONFIG_ERROR,
+            "Interactive prompt required, but json mode is active",
+            failed_step="validate",
+        )
         sys.exit(EXIT_CONFIG_ERROR)
     try:
         print(prompt, end="", file=sys.stderr, flush=True)
@@ -92,7 +100,13 @@ def _prompt_text(prompt, args=None):
 
 def _prompt_secret(prompt, args=None):
     if args and getattr(args, "json", False):
-        emit_json_error(args, "setup", EXIT_CONFIG_ERROR, "Interactive prompt required, but json mode is active", failed_step="validate")
+        emit_json_error(
+            args,
+            "setup",
+            EXIT_CONFIG_ERROR,
+            "Interactive prompt required, but json mode is active",
+            failed_step="validate",
+        )
         sys.exit(EXIT_CONFIG_ERROR)
     try:
         return getpass.getpass(prompt)
@@ -113,11 +127,20 @@ def _prompt_access_code_file_path(args=None):
     return default_path
 
 
-def _build_setup_config(ip, serial, model, nozzle, access_code=None,
-                        access_code_file=None, orca_slicer=None,
-                        profiles_dir=None, cert_fingerprint=None,
-                        insecure_tls=False):
+def _build_setup_config(
+    ip,
+    serial,
+    model,
+    nozzle,
+    access_code=None,
+    access_code_file=None,
+    orca_slicer=None,
+    profiles_dir=None,
+    cert_fingerprint=None,
+    insecure_tls=False,
+):
     from bambu_cli.config import _DEFAULT_ORCA, _DEFAULT_PROFILES
+
     serial_val = serial.strip().upper()
     if not re.match(r"^[A-Za-z0-9_-]+$", serial_val):
         raise ValueError(f"Invalid serial number: {serial_val}. Serial number must be alphanumeric.")
@@ -196,7 +219,7 @@ def _validate_setup_access_code_file(args, access_code_file):
     if not access_code_file:
         return None
     expanded = _expand_path(access_code_file)
-    if expanded.startswith('-'):
+    if expanded.startswith("-"):
         message = f"Invalid access-code file path: {_display_path(expanded)}"
         logger.error(message)
         _setup_json_error(args, message, **_setup_path_details(access_code_file=expanded))

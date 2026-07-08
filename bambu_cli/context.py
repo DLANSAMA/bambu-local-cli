@@ -74,9 +74,7 @@ class Settings:
         nozzle_size = str(cfg.get("nozzle", cfg.get("nozzle_size", "0.4")))
         camera_port = cfg.get("camera_port", "1985:1984")
         host_port = camera_port.split(":")[0]
-        camera_stream_url = cfg.get(
-            "camera_stream_url", f"http://localhost:{host_port}/api/frame.jpeg?src=p1s"
-        )
+        camera_stream_url = cfg.get("camera_stream_url", f"http://localhost:{host_port}/api/frame.jpeg?src=p1s")
 
         return cls(
             printer_ip=cfg.get("printer_ip", "0.0.0.0"),
@@ -105,7 +103,9 @@ class Settings:
             serial=bambu.SERIAL,
             mqtt_port=bambu.MQTT_PORT,
             insecure_tls=bambu.INSECURE_TLS,
-            cert_fingerprint=getattr(bambu, "_cfg", {}).get("cert_fingerprint") if getattr(bambu, "_cfg", None) else None,
+            cert_fingerprint=getattr(bambu, "_cfg", {}).get("cert_fingerprint")
+            if getattr(bambu, "_cfg", None)
+            else None,
             orca_slicer=bambu.ORCA_SLICER,
             profiles_dir=bambu.PROFILES_DIR,
             printer_model=bambu.PRINTER_MODEL,

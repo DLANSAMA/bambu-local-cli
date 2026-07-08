@@ -1,4 +1,5 @@
 """The `download` command: HTTP fetch loop, redirects, HTML resolution, limits."""
+
 import os
 import sys
 import tempfile
@@ -72,6 +73,7 @@ def _cmd_download(args):
     # working after the package split.
     from bambu_cli import download as _download_pkg
     from bambu_cli import utils
+
     utils._LAST_DOWNLOAD_PAYLOAD = None
     source_url = args.url
     url = _normalize_url_input(source_url)
@@ -79,32 +81,43 @@ def _cmd_download(args):
     source_report = _redact_url_credentials(source_url)
     normalized_source_report = _redact_url_credentials(normalized_source)
     max_download_bytes = _validate_max_download_mb_or_exit(args)
-    _validate_download_url_or_exit(
-        args, source_url, normalized_source, url, "validate", "Invalid URL source")
+    _validate_download_url_or_exit(args, source_url, normalized_source, url, "validate", "Invalid URL source")
     is_printables_model = _is_printables_model_url(url)
     if not is_printables_model:
-        _reject_unsupported_download_extension(
-            args, source_url, normalized_source, url, urlparse(url).path)
+        _reject_unsupported_download_extension(args, source_url, normalized_source, url, urlparse(url).path)
 
     outdir = _expand_path(args.output) if args.output else tempfile.gettempdir()
-    if outdir.startswith('-'):
+    if outdir.startswith("-"):
         message = f"Invalid output directory: {_path_for_message(outdir)}"
         logger.error(message)
         emit_json_error(
-            args, "download", EXIT_COMMAND_ERROR, message, failed_step="validate",
-            source=source_report, normalized_source=normalized_source_report, output=outdir)
+            args,
+            "download",
+            EXIT_COMMAND_ERROR,
+            message,
+            failed_step="validate",
+            source=source_report,
+            normalized_source=normalized_source_report,
+            output=outdir,
+        )
         sys.exit(EXIT_COMMAND_ERROR)
     try:
         _ensure_output_dir(outdir)
     except SystemExit as exc:
         emit_json_error(
-            args, "download", _exit_code_from_system_exit(exc, EXIT_FILE_ERROR),
-            f"Could not prepare output directory: {_path_for_message(outdir)}", failed_step="validate",
-            source=source_report, normalized_source=normalized_source_report, output=outdir)
+            args,
+            "download",
+            _exit_code_from_system_exit(exc, EXIT_FILE_ERROR),
+            f"Could not prepare output directory: {_path_for_message(outdir)}",
+            failed_step="validate",
+            source=source_report,
+            normalized_source=normalized_source_report,
+            output=outdir,
+        )
         raise
     headers = {
-        'User-Agent': _default_user_agent(),
-        'Accept': '*/*',
+        "User-Agent": _default_user_agent(),
+        "Accept": "*/*",
     }
 
     resolved_url, stl_name = _download_pkg.resolve_printables_url(url)
@@ -114,19 +127,23 @@ def _cmd_download(args):
     if is_printables_model:
         if not resolved_url:
             emit_json_error(
-                args, "download", EXIT_COMMAND_ERROR,
-                "Failed to resolve Printables model URL.", failed_step="resolve",
-                source=source_report, normalized_source=normalized_source_report)
+                args,
+                "download",
+                EXIT_COMMAND_ERROR,
+                "Failed to resolve Printables model URL.",
+                failed_step="resolve",
+                source=source_report,
+                normalized_source=normalized_source_report,
+            )
             sys.exit(EXIT_COMMAND_ERROR)  # Failed to resolve, error message already printed
         url = resolved_url
-        _reject_unsupported_download_extension(
-            args, source_url, normalized_source, url, stl_name)
-        _reject_unsupported_download_extension(
-            args, source_url, normalized_source, url, urlparse(url).path)
+        _reject_unsupported_download_extension(args, source_url, normalized_source, url, stl_name)
+        _reject_unsupported_download_extension(args, source_url, normalized_source, url, urlparse(url).path)
 
     # Security: Validate URL scheme to prevent SSRF (e.g. file://)
     _validate_download_url_or_exit(
-        args, source_url, normalized_source, url, "validate", "Invalid resolved download URL")
+        args, source_url, normalized_source, url, "validate", "Invalid resolved download URL"
+    )
 
     partial_path = None
     replace_on_success = False
@@ -137,7 +154,8 @@ def _cmd_download(args):
             archive_download = _is_archive_download(url, stl_name)
             if archive_download:
                 archive_temp = tempfile.NamedTemporaryFile(  # noqa: SIM115 — closed immediately; only the name is used
-                    prefix=".bambu-download-", suffix=".zip", dir=outdir, delete=False)
+                    prefix=".bambu-download-", suffix=".zip", dir=outdir, delete=False
+                )
                 outpath = archive_temp.name
                 archive_temp.close()
                 filename = _portable_basename(outpath)
@@ -165,7 +183,13 @@ def _cmd_download(args):
                             _remove_partial_file(partial_path)
                             partial_path = None
                         _reject_unsupported_download_extension(
-                            args, source_url, normalized_source, final_url, urlparse(final_url).path, failed_step="download")
+                            args,
+                            source_url,
+                            normalized_source,
+                            final_url,
+                            urlparse(final_url).path,
+                            failed_step="download",
+                        )
                     except SystemExit:
                         _remove_partial_file(partial_path)
                         partial_path = None
@@ -176,13 +200,14 @@ def _cmd_download(args):
                         outpath = os.path.join(outdir, filename)
                         outpath = _download_pkg._noncolliding_path(outpath)
                         filename = _portable_basename(outpath)
-                content_type = _response_header(resp, 'Content-Type')
+                content_type = _response_header(resp, "Content-Type")
                 archive_download = archive_download or _is_archive_download(url, stl_name, content_type)
                 if archive_download and not filename.startswith(".bambu-download-"):
                     if partial_path and partial_path != outpath:
                         _remove_partial_file(partial_path)
                     archive_temp = tempfile.NamedTemporaryFile(  # noqa: SIM115 — closed immediately; only the name is used
-                        prefix=".bambu-download-", suffix=".zip", dir=outdir, delete=False)
+                        prefix=".bambu-download-", suffix=".zip", dir=outdir, delete=False
+                    )
                     outpath = archive_temp.name
                     archive_temp.close()
                     filename = _portable_basename(outpath)
@@ -207,22 +232,32 @@ def _cmd_download(args):
                             "Invalid resolved HTML model URL",
                         )
                         _reject_unsupported_download_extension(
-                            args, source_url, normalized_source, url, stl_name, failed_step="resolve")
+                            args, source_url, normalized_source, url, stl_name, failed_step="resolve"
+                        )
                         _reject_unsupported_download_extension(
-                            args, source_url, normalized_source, url, urlparse(url).path, failed_step="resolve")
+                            args, source_url, normalized_source, url, urlparse(url).path, failed_step="resolve"
+                        )
                         continue
                     message = "HTML page did not contain a direct model file link."
                     logger.error(message)
-                    logger.info("   Use a Printables model page, a direct .stl/.step/.stp/.obj/.3mf/.gcode/.zip download URL, or a page with a direct model-file link.")
+                    logger.info(
+                        "   Use a Printables model page, a direct .stl/.step/.stp/.obj/.3mf/.gcode/.zip download URL, or a page with a direct model-file link."
+                    )
                     emit_json_error(
-                        args, "download", EXIT_FILE_ERROR, message, failed_step="resolve",
-                        source=source_report, normalized_source=normalized_source_report,
-                        download_url=_redact_url_credentials(url))
+                        args,
+                        "download",
+                        EXIT_FILE_ERROR,
+                        message,
+                        failed_step="resolve",
+                        source=source_report,
+                        normalized_source=normalized_source_report,
+                        download_url=_redact_url_credentials(url),
+                    )
                     sys.exit(EXIT_FILE_ERROR)
                 if not archive_download:
                     _reject_unsupported_content_type(args, source_url, normalized_source, url, content_type)
 
-                header_filename = _filename_from_content_disposition(_response_header(resp, 'Content-Disposition'))
+                header_filename = _filename_from_content_disposition(_response_header(resp, "Content-Disposition"))
                 if header_filename and _is_archive_download(url, header_filename, content_type):
                     archive_download = True
                 if header_filename and (_namespace_get(args, "name") or not stl_name):
@@ -232,7 +267,8 @@ def _cmd_download(args):
                         if outpath and filename.startswith(".bambu-download-"):
                             _remove_partial_file(outpath)
                         archive_temp = tempfile.NamedTemporaryFile(  # noqa: SIM115 — closed immediately; only the name is used
-                            prefix=".bambu-download-", suffix=".zip", dir=outdir, delete=False)
+                            prefix=".bambu-download-", suffix=".zip", dir=outdir, delete=False
+                        )
                         outpath = archive_temp.name
                         archive_temp.close()
                         filename = _portable_basename(outpath)
@@ -240,7 +276,8 @@ def _cmd_download(args):
                         replace_on_success = False
                     else:
                         _reject_unsupported_download_extension(
-                            args, source_url, normalized_source, url, header_filename, failed_step="download")
+                            args, source_url, normalized_source, url, header_filename, failed_step="download"
+                        )
                         if _namespace_get(args, "name"):
                             filename = _download_filename_with_extension(
                                 _sanitize_download_filename(_namespace_get(args, "name")),
@@ -248,7 +285,9 @@ def _cmd_download(args):
                                 fallback_name=header_filename,
                             )
                         else:
-                            filename = _download_filename_with_extension(header_filename, url, fallback_name=header_filename)
+                            filename = _download_filename_with_extension(
+                                header_filename, url, fallback_name=header_filename
+                            )
                         outpath = os.path.join(outdir, filename)
                         outpath = _download_pkg._noncolliding_path(outpath)
                         filename = _portable_basename(outpath)
@@ -256,7 +295,7 @@ def _cmd_download(args):
                 logger.info(f"⬇️  Downloading {filename}...")
                 if not archive_download:
                     partial_path, replace_on_success = _download_partial_path(outpath)
-                content_length = _response_header(resp, 'Content-Length')
+                content_length = _response_header(resp, "Content-Length")
                 try:
                     total_size = int(content_length) if content_length else None
                 except ValueError:
@@ -291,6 +330,7 @@ def _cmd_download(args):
                             TimeRemainingColumn,
                             TransferSpeedColumn,
                         )
+
                         progress = Progress(
                             TextColumn("[bold blue]{task.description}", justify="right"),
                             BarColumn(bar_width=None),
@@ -301,7 +341,7 @@ def _cmd_download(args):
                             TransferSpeedColumn(),
                             "•",
                             TimeRemainingColumn(),
-                            transient=True
+                            transient=True,
                         )
                         progress.start()
                         task_id = progress.add_task("Downloading", total=total_size)
@@ -309,7 +349,7 @@ def _cmd_download(args):
                     pass
 
                 try:
-                    with open(partial_path, 'wb') as f:
+                    with open(partial_path, "wb") as f:
                         while True:
                             chunk = resp.read(chunk_size)
                             if not chunk:
@@ -325,7 +365,9 @@ def _cmd_download(args):
                             elif total_size and total_size > 0:
                                 percent = int((downloaded / total_size) * 100)
                                 if percent - last_percent_reported >= 10:
-                                    logger.info(f"   Download progress: {percent}% ({downloaded // 1024}KB / {total_size // 1024}KB)")
+                                    logger.info(
+                                        f"   Download progress: {percent}% ({downloaded // 1024}KB / {total_size // 1024}KB)"
+                                    )
                                     last_percent_reported = percent
                 finally:
                     if progress:
@@ -348,10 +390,18 @@ def _cmd_download(args):
                     message = f"Download ended early: received {downloaded} of {total_size} bytes."
                     logger.error(message)
                     emit_json_error(
-                        args, "download", EXIT_NETWORK_ERROR, message, failed_step="download",
-                        source=source_report, normalized_source=normalized_source_report,
-                        download_url=_redact_url_credentials(url), path=outpath, received_bytes=downloaded,
-                        expected_bytes=total_size)
+                        args,
+                        "download",
+                        EXIT_NETWORK_ERROR,
+                        message,
+                        failed_step="download",
+                        source=source_report,
+                        normalized_source=normalized_source_report,
+                        download_url=_redact_url_credentials(url),
+                        path=outpath,
+                        received_bytes=downloaded,
+                        expected_bytes=total_size,
+                    )
                     sys.exit(EXIT_NETWORK_ERROR)
 
             size = os.path.getsize(partial_path)
@@ -360,9 +410,17 @@ def _cmd_download(args):
                 message = "Downloaded file is empty; refusing to use it."
                 logger.error(message)
                 emit_json_error(
-                    args, "download", EXIT_FILE_ERROR, message, failed_step="download",
-                    source=source_report, normalized_source=normalized_source_report,
-                    download_url=_redact_url_credentials(url), path=outpath, bytes=size)
+                    args,
+                    "download",
+                    EXIT_FILE_ERROR,
+                    message,
+                    failed_step="download",
+                    source=source_report,
+                    normalized_source=normalized_source_report,
+                    download_url=_redact_url_credentials(url),
+                    path=outpath,
+                    bytes=size,
+                )
                 sys.exit(EXIT_FILE_ERROR)
             if replace_on_success:
                 os.replace(partial_path, outpath)
@@ -370,15 +428,24 @@ def _cmd_download(args):
             if archive_download:
                 archive_path = outpath
                 try:
-                    extracted_path, extracted_filename, archive_entry, size = _extract_zip_model(archive_path, outdir, args)
+                    extracted_path, extracted_filename, archive_entry, size = _extract_zip_model(
+                        archive_path, outdir, args
+                    )
                 except OSError as exc:
                     _remove_partial_file(archive_path)
                     message = f"Failed to extract archive: {exc}"
                     logger.error(message)
                     emit_json_error(
-                        args, "download", EXIT_FILE_ERROR, message, failed_step="extract",
-                        source=source_report, normalized_source=normalized_source_report,
-                        download_url=_redact_url_credentials(url), path=archive_path)
+                        args,
+                        "download",
+                        EXIT_FILE_ERROR,
+                        message,
+                        failed_step="extract",
+                        source=source_report,
+                        normalized_source=normalized_source_report,
+                        download_url=_redact_url_credentials(url),
+                        path=archive_path,
+                    )
                     sys.exit(EXIT_FILE_ERROR)
                 except ValueError as exc:
                     _remove_partial_file(archive_path)
@@ -386,44 +453,63 @@ def _cmd_download(args):
                     message = str(exc)
                     logger.error(message)
                     emit_json_error(
-                        args, "download", EXIT_FILE_ERROR, message, failed_step="extract",
-                        source=source_report, normalized_source=normalized_source_report,
-                        download_url=_redact_url_credentials(url), path=archive_path)
+                        args,
+                        "download",
+                        EXIT_FILE_ERROR,
+                        message,
+                        failed_step="extract",
+                        source=source_report,
+                        normalized_source=normalized_source_report,
+                        download_url=_redact_url_credentials(url),
+                        path=archive_path,
+                    )
                     sys.exit(EXIT_FILE_ERROR)
                 _remove_partial_file(archive_path)
                 partial_path = None
                 logger.info(f"✅ Downloaded: {_path_for_message(extracted_path)} ({size // 1024}KB)")
-                _record_download_success(args, {
+                _record_download_success(
+                    args,
+                    {
+                        "status": "downloaded",
+                        "command": "download",
+                        "source": source_report,
+                        "normalized_source": normalized_source_report,
+                        "download_url": _redact_url_credentials(url),
+                        "path": extracted_path,
+                        "filename": extracted_filename,
+                        "archive_entry": archive_entry,
+                        "bytes": size,
+                    },
+                )
+                return extracted_path
+            logger.info(f"✅ Downloaded: {_path_for_message(outpath)} ({size // 1024}KB)")
+            _record_download_success(
+                args,
+                {
                     "status": "downloaded",
                     "command": "download",
                     "source": source_report,
                     "normalized_source": normalized_source_report,
                     "download_url": _redact_url_credentials(url),
-                    "path": extracted_path,
-                    "filename": extracted_filename,
-                    "archive_entry": archive_entry,
+                    "path": outpath,
+                    "filename": filename,
                     "bytes": size,
-                })
-                return extracted_path
-            logger.info(f"✅ Downloaded: {_path_for_message(outpath)} ({size // 1024}KB)")
-            _record_download_success(args, {
-                "status": "downloaded",
-                "command": "download",
-                "source": source_report,
-                "normalized_source": normalized_source_report,
-                "download_url": _redact_url_credentials(url),
-                "path": outpath,
-                "filename": filename,
-                "bytes": size,
-            })
+                },
+            )
             return outpath
 
         message = "Could not resolve HTML page to a direct model file."
         logger.error(message)
         emit_json_error(
-            args, "download", EXIT_FILE_ERROR, message, failed_step="resolve",
-            source=source_report, normalized_source=normalized_source_report,
-            download_url=_redact_url_credentials(url))
+            args,
+            "download",
+            EXIT_FILE_ERROR,
+            message,
+            failed_step="resolve",
+            source=source_report,
+            normalized_source=normalized_source_report,
+            download_url=_redact_url_credentials(url),
+        )
         sys.exit(EXIT_FILE_ERROR)
     except urllib.error.HTTPError as e:
         _remove_partial_file(partial_path)
@@ -434,9 +520,17 @@ def _cmd_download(args):
         elif e.code == 403:
             logger.info("   Access is forbidden. Printables or the host may be blocking automated requests.")
         emit_json_error(
-            args, "download", EXIT_NETWORK_ERROR, message, failed_step="download",
-            source=source_report, normalized_source=normalized_source_report, download_url=_redact_url_credentials(url),
-            http_status=e.code, path=outpath)
+            args,
+            "download",
+            EXIT_NETWORK_ERROR,
+            message,
+            failed_step="download",
+            source=source_report,
+            normalized_source=normalized_source_report,
+            download_url=_redact_url_credentials(url),
+            http_status=e.code,
+            path=outpath,
+        )
         try:
             e.close()
         except Exception:
@@ -444,38 +538,66 @@ def _cmd_download(args):
         sys.exit(EXIT_NETWORK_ERROR)
     except urllib.error.URLError as e:
         _remove_partial_file(partial_path)
-        err_msg = str(e.reason) if hasattr(e, 'reason') else str(e)
+        err_msg = str(e.reason) if hasattr(e, "reason") else str(e)
         if "Security Error" in err_msg:
             message = f"SSRF Security Violation Blocked: {err_msg}"
             logger.error(message)
             emit_json_error(
-                args, "download", EXIT_COMMAND_ERROR, message, failed_step="validate",
-                source=source_report, normalized_source=normalized_source_report, download_url=_redact_url_credentials(url),
-                path=outpath)
+                args,
+                "download",
+                EXIT_COMMAND_ERROR,
+                message,
+                failed_step="validate",
+                source=source_report,
+                normalized_source=normalized_source_report,
+                download_url=_redact_url_credentials(url),
+                path=outpath,
+            )
             sys.exit(EXIT_COMMAND_ERROR)
         message = f"Network error during download: {e}"
         logger.error(message)
         logger.info("   Please check your internet connection or verify the domain name resolves correctly.")
         emit_json_error(
-            args, "download", EXIT_NETWORK_ERROR, message, failed_step="download",
-            source=source_report, normalized_source=normalized_source_report, download_url=_redact_url_credentials(url),
-            path=outpath)
+            args,
+            "download",
+            EXIT_NETWORK_ERROR,
+            message,
+            failed_step="download",
+            source=source_report,
+            normalized_source=normalized_source_report,
+            download_url=_redact_url_credentials(url),
+            path=outpath,
+        )
         sys.exit(EXIT_NETWORK_ERROR)
     except OSError as e:
         _remove_partial_file(partial_path)
         message = f"Local file error during download: {_exception_for_message(e)}"
         logger.error(message)
         emit_json_error(
-            args, "download", EXIT_FILE_ERROR, message, failed_step="download",
-            source=source_report, normalized_source=normalized_source_report, download_url=_redact_url_credentials(url),
-            path=outpath)
+            args,
+            "download",
+            EXIT_FILE_ERROR,
+            message,
+            failed_step="download",
+            source=source_report,
+            normalized_source=normalized_source_report,
+            download_url=_redact_url_credentials(url),
+            path=outpath,
+        )
         sys.exit(EXIT_FILE_ERROR)
     except Exception as e:
         _remove_partial_file(partial_path)
         message = f"Download failed: {e}"
         logger.error(message)
         emit_json_error(
-            args, "download", EXIT_NETWORK_ERROR, message, failed_step="download",
-            source=source_report, normalized_source=normalized_source_report, download_url=_redact_url_credentials(url),
-            path=outpath)
+            args,
+            "download",
+            EXIT_NETWORK_ERROR,
+            message,
+            failed_step="download",
+            source=source_report,
+            normalized_source=normalized_source_report,
+            download_url=_redact_url_credentials(url),
+            path=outpath,
+        )
         sys.exit(EXIT_NETWORK_ERROR)

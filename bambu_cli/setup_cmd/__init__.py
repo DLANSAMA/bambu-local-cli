@@ -6,6 +6,7 @@ name the old module exposed is re-exported here so imports and the
 ``bambu_cli.bambu`` facade keep working. Tests that patch preflight
 dependencies target the submodule (``bambu_cli.setup_cmd.preflight.<name>``).
 """
+
 from bambu_cli.config import load_config  # noqa: F401 -- re-exported for compat
 from bambu_cli.setup_cmd.common import (  # noqa: F401
     _build_setup_config,

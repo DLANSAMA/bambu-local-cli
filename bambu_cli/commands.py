@@ -8,10 +8,14 @@ from bambu_cli.logging_utils import logger
 
 # We dynamically import bambu at runtime in every function to support patching of functions and configuration globals
 
+
 def cmd_setup(args):
     """Interactive or non-interactive printer configuration setup."""
     from bambu_cli import bambu
+
     bambu._cmd_setup(args)
+
+
 from bambu_cli.utils import get_sequence_id
 
 
@@ -44,7 +48,7 @@ def cmd_doctor(args, ctx=None):
 
     cap_path = _namespace_get(args, "output") or os.path.join(tempfile.gettempdir(), "printer_capabilities.json")
     cap_path = bambu._expand_path(cap_path)
-    if cap_path.startswith('-'):
+    if cap_path.startswith("-"):
         message = f"Invalid output path: {_path_for_message(cap_path)}"
         logger.error(message)
         emit_doctor_failure("validate", EXIT_FILE_ERROR, message)
@@ -55,7 +59,8 @@ def cmd_doctor(args, ctx=None):
         emit_doctor_failure(
             "validate",
             bambu._exit_code_from_system_exit(exc, EXIT_FILE_ERROR),
-            f"Could not prepare output path: {_path_for_message(cap_path)}")
+            f"Could not prepare output path: {_path_for_message(cap_path)}",
+        )
         raise
 
     logger.info("🩺 Running Bambu printer health check...")
@@ -86,7 +91,9 @@ def cmd_doctor(args, ctx=None):
     if status:
         logger.info("   ✅ MQTT connection established. Printer identified.")
     else:
-        message = f"MQTT connection failed. Ensure printer at {ctx.settings.printer_ip} is on and access code is correct."
+        message = (
+            f"MQTT connection failed. Ensure printer at {ctx.settings.printer_ip} is on and access code is correct."
+        )
         logger.error(f"   ❌ {message}")
         log_pin_hint()
         extra = {"certificate_fingerprint": fp} if fp else None
@@ -129,46 +136,59 @@ def cmd_doctor(args, ctx=None):
             "ams": "ams" in status,
             "chamber_light": True,
             "camera_snapshot": ctx.settings.printer_model in ("P1P", "P1S"),
-            "camera_snapshot_note": "snapshot uses the optional BambuP1Streamer container and is intended for P1P/P1S"
-        }
+            "camera_snapshot_note": "snapshot uses the optional BambuP1Streamer container and is intended for P1P/P1S",
+        },
     }
 
     try:
-        with open(cap_path, 'w', encoding="utf-8") as f:
+        with open(cap_path, "w", encoding="utf-8") as f:
             json.dump(capabilities, f, indent=2)
     except OSError as e:
         message = f"Could not write printer capabilities to {_path_for_message(cap_path)}: {_exception_for_message(e)}"
         logger.error(message)
         emit_doctor_failure("output", EXIT_FILE_ERROR, message, extra={"output": cap_path})
         sys.exit(EXIT_FILE_ERROR)
-    logger.info(f"\n✨ Printer Details: Model={capabilities['model']}, Firmware={capabilities['firmware']}, Serial={capabilities['serial']}")
+    logger.info(
+        f"\n✨ Printer Details: Model={capabilities['model']}, Firmware={capabilities['firmware']}, Serial={capabilities['serial']}"
+    )
     logger.info(f"✅ All checks passed! Printer capabilities saved to {_display_path(cap_path)}")
     if json_mode:
         # Mask IP address inside doctor capabilities report unless --verbose is checked (A0530-SEC-16)
         reported_ip = ctx.settings.printer_ip if bool(_namespace_get(args, "verbose", False)) else "<redacted>"
-        emit_json({
-            "command": "doctor",
-            "ok": True,
-            "status": "ok",
-            "output": cap_path,
-            "printer_ip": reported_ip,
-            "certificate_fingerprint": fp,
-            "capabilities": capabilities,
-        })
+        emit_json(
+            {
+                "command": "doctor",
+                "ok": True,
+                "status": "ok",
+                "output": cap_path,
+                "printer_ip": reported_ip,
+                "certificate_fingerprint": fp,
+                "capabilities": capabilities,
+            }
+        )
+
 
 def cmd_light(args, ctx=None):
     """Control chamber light."""
     from bambu_cli.cli import _namespace_get
     from bambu_cli.constants import EXIT_NETWORK_ERROR
     from bambu_cli.utils import emit_json, emit_json_error
+
     ctx = ctx or RuntimeContext.from_globals(args)
     action = args.action  # on or off
     val = "on" if action == "on" else "off"
-    payload = json.dumps({
-        "system": {"sequence_id": get_sequence_id(), "command": "ledctrl",
-                   "led_node": "chamber_light", "led_mode": val,
-                   "led_on_time": 500, "led_off_time": 500}
-    })
+    payload = json.dumps(
+        {
+            "system": {
+                "sequence_id": get_sequence_id(),
+                "command": "ledctrl",
+                "led_node": "chamber_light",
+                "led_mode": val,
+                "led_on_time": 500,
+                "led_off_time": 500,
+            }
+        }
+    )
     printer = ctx.printer()
     if not printer.send_command(payload):
         message = "Failed to send light command."
@@ -177,18 +197,22 @@ def cmd_light(args, ctx=None):
         sys.exit(EXIT_NETWORK_ERROR)
     logger.info(f"💡 Light turned {action}")
     if bool(_namespace_get(args, "json", False)):
-        emit_json({
-            "status": "light_changed",
-            "command": "light",
-            "action": action,
-            "changed": True,
-        })
+        emit_json(
+            {
+                "status": "light_changed",
+                "command": "light",
+                "action": action,
+                "changed": True,
+            }
+        )
+
 
 def cmd_pause(args, ctx=None):
     """Pause current print."""
     from bambu_cli.cli import _namespace_get
     from bambu_cli.constants import EXIT_NETWORK_ERROR
     from bambu_cli.utils import emit_json, emit_json_error
+
     ctx = ctx or RuntimeContext.from_globals(args)
     payload = json.dumps({"print": {"sequence_id": get_sequence_id(), "command": "pause"}})
     printer = ctx.printer()
@@ -199,17 +223,21 @@ def cmd_pause(args, ctx=None):
         sys.exit(EXIT_NETWORK_ERROR)
     logger.info("⏸️  Print paused")
     if bool(_namespace_get(args, "json", False)):
-        emit_json({
-            "status": "paused",
-            "command": "pause",
-            "paused": True,
-        })
+        emit_json(
+            {
+                "status": "paused",
+                "command": "pause",
+                "paused": True,
+            }
+        )
+
 
 def cmd_resume(args, ctx=None):
     """Resume paused print."""
     from bambu_cli.cli import _namespace_get
     from bambu_cli.constants import EXIT_NETWORK_ERROR
     from bambu_cli.utils import emit_json, emit_json_error
+
     ctx = ctx or RuntimeContext.from_globals(args)
     payload = json.dumps({"print": {"sequence_id": get_sequence_id(), "command": "resume"}})
     printer = ctx.printer()
@@ -220,27 +248,33 @@ def cmd_resume(args, ctx=None):
         sys.exit(EXIT_NETWORK_ERROR)
     logger.info("▶️  Print resumed")
     if bool(_namespace_get(args, "json", False)):
-        emit_json({
-            "status": "resumed",
-            "command": "resume",
-            "resumed": True,
-        })
+        emit_json(
+            {
+                "status": "resumed",
+                "command": "resume",
+                "resumed": True,
+            }
+        )
+
 
 def cmd_stop(args, ctx=None):
     """Stop current print."""
     from bambu_cli.cli import _namespace_get
     from bambu_cli.constants import EXIT_COMMAND_ERROR, EXIT_NETWORK_ERROR
     from bambu_cli.utils import emit_json, emit_json_error
+
     ctx = ctx or RuntimeContext.from_globals(args)
     if not args.confirm:
         logger.warning("⚠️  This will STOP the current print. Add --confirm to proceed.")
         if bool(_namespace_get(args, "json", False)):
-            emit_json({
-                "status": "confirmation_required",
-                "command": "stop",
-                "stopped": False,
-                "next_command": ["stop", "--confirm", "--json"],
-            })
+            emit_json(
+                {
+                    "status": "confirmation_required",
+                    "command": "stop",
+                    "stopped": False,
+                    "next_command": ["stop", "--confirm", "--json"],
+                }
+            )
         sys.exit(EXIT_COMMAND_ERROR)
     payload = json.dumps({"print": {"sequence_id": get_sequence_id(), "command": "stop"}})
     printer = ctx.printer()
@@ -251,11 +285,14 @@ def cmd_stop(args, ctx=None):
         sys.exit(EXIT_NETWORK_ERROR)
     logger.info("⏹️  Print stopped")
     if bool(_namespace_get(args, "json", False)):
-        emit_json({
-            "status": "stopped",
-            "command": "stop",
-            "stopped": True,
-        })
+        emit_json(
+            {
+                "status": "stopped",
+                "command": "stop",
+                "stopped": True,
+            }
+        )
+
 
 def cmd_upload(args, ctx=None):
     """Upload a file to the printer via FTPS with binary retry/resume."""
@@ -267,7 +304,7 @@ def cmd_upload(args, ctx=None):
 
     ctx = ctx or RuntimeContext.from_globals(args)
     filepath = bambu._expand_path(args.file)
-    if filepath.startswith('-'):
+    if filepath.startswith("-"):
         message = f"Invalid filepath: {bambu._path_for_message(filepath)}"
         logger.error(message)
         emit_json_error(args, "upload", EXIT_FILE_ERROR, message, failed_step="validate", file=filepath)
@@ -287,27 +324,44 @@ def cmd_upload(args, ctx=None):
     if bambu._safe_remote_name(filename) is None:
         message = f"Refusing to upload file with unsafe name: {bambu._name_for_message(filename)!r}"
         logger.error(message)
-        emit_json_error(args, "upload", EXIT_FILE_ERROR, message, failed_step="validate", file=filepath, remote_name=filename)
+        emit_json_error(
+            args, "upload", EXIT_FILE_ERROR, message, failed_step="validate", file=filepath, remote_name=filename
+        )
         sys.exit(EXIT_FILE_ERROR)
     if not bambu._is_print_ready_name(filename):
         message = bambu._print_ready_error_message(filename, "upload")
         logger.error(message)
-        emit_json_error(args, "upload", EXIT_FILE_ERROR, message, failed_step="validate", file=filepath, remote_name=filename)
+        emit_json_error(
+            args, "upload", EXIT_FILE_ERROR, message, failed_step="validate", file=filepath, remote_name=filename
+        )
         sys.exit(EXIT_FILE_ERROR)
     try:
         filesize = os.path.getsize(filepath)
     except OSError as exc:
-        message = f"Could not read file size for {bambu._path_for_message(filepath)}: {bambu._exception_for_message(exc)}"
+        message = (
+            f"Could not read file size for {bambu._path_for_message(filepath)}: {bambu._exception_for_message(exc)}"
+        )
         logger.error(message)
-        emit_json_error(args, "upload", EXIT_FILE_ERROR, message, failed_step="validate", file=filepath, remote_name=filename)
+        emit_json_error(
+            args, "upload", EXIT_FILE_ERROR, message, failed_step="validate", file=filepath, remote_name=filename
+        )
         sys.exit(EXIT_FILE_ERROR)
     if filesize <= 0:
         message = f"Refusing to upload empty file: {bambu._path_for_message(filepath)}"
         logger.error(message)
-        emit_json_error(args, "upload", EXIT_FILE_ERROR, message, failed_step="validate", file=filepath, remote_name=filename, bytes=filesize)
+        emit_json_error(
+            args,
+            "upload",
+            EXIT_FILE_ERROR,
+            message,
+            failed_step="validate",
+            file=filepath,
+            remote_name=filename,
+            bytes=filesize,
+        )
         sys.exit(EXIT_FILE_ERROR)
 
-    if getattr(args, 'dry_run', False):
+    if getattr(args, "dry_run", False):
         logger.info(f"🔍 Dry Run: Validating printer connectivity for {filename}...")
         printer = get_printer()
         try:
@@ -318,43 +372,50 @@ def cmd_upload(args, ctx=None):
         except Exception:
             message = "Dry run failed: Could not reach printer."
             logger.error(message)
-            emit_json_error(args, "upload", EXIT_NETWORK_ERROR, message, failed_step="dry_run", file=filepath, remote_name=filename)
+            emit_json_error(
+                args, "upload", EXIT_NETWORK_ERROR, message, failed_step="dry_run", file=filepath, remote_name=filename
+            )
             sys.exit(EXIT_NETWORK_ERROR)
 
         logger.info(f"   ✅ Local file {bambu._path_for_message(filepath)} exists ({filesize // 1024}KB)")
         if bool(_namespace_get(args, "json", False)):
-            emit_json({
-                "status": "dry_run_ok",
-                "command": "upload",
-                "file": filepath,
-                "remote_name": filename,
-                "bytes": filesize,
-                "uploaded": False,
-            })
+            emit_json(
+                {
+                    "status": "dry_run_ok",
+                    "command": "upload",
+                    "file": filepath,
+                    "remote_name": filename,
+                    "bytes": filesize,
+                    "uploaded": False,
+                }
+            )
         return filename
 
     logger.info(f"📤 Uploading {filename} ({filesize // 1024}KB)...")
 
     printer = get_printer()
-    
+
     progress = None
     task_id = None
     upload_callback = None
     try:
         if not getattr(args, "json", False) and getattr(args, "progress", True) and sys.stdout.isatty():
             from rich.progress import DownloadColumn, Progress, TimeRemainingColumn, TransferSpeedColumn
+
             progress = Progress(
                 "[progress.description]{task.description}",
                 "[progress.percentage]{task.percentage:>3.0f}%",
                 DownloadColumn(),
                 TransferSpeedColumn(),
                 TimeRemainingColumn(),
-                transient=True
+                transient=True,
             )
             progress.start()
             task_id = progress.add_task(f"Uploading {filename}...", total=filesize)
+
             def _cb(block):
                 progress.update(task_id, advance=len(block))
+
             upload_callback = _cb
     except ImportError:
         pass
@@ -363,7 +424,13 @@ def cmd_upload(args, ctx=None):
         on_resume = None
         if progress is not None and task_id is not None:
             on_resume = lambda n: progress.update(task_id, completed=n)
-        success = printer.upload_file(filepath, f'/model/{filename}', timeout=getattr(bambu, 'UPLOAD_TIMEOUT', 300), progress_callback=upload_callback, on_resume=on_resume)
+        success = printer.upload_file(
+            filepath,
+            f"/model/{filename}",
+            timeout=getattr(bambu, "UPLOAD_TIMEOUT", 300),
+            progress_callback=upload_callback,
+            on_resume=on_resume,
+        )
     finally:
         if progress:
             progress.stop()
@@ -371,14 +438,16 @@ def cmd_upload(args, ctx=None):
     if success:
         logger.info(f"✅ Uploaded {filename} to printer")
         if bool(_namespace_get(args, "json", False)):
-            emit_json({
-                "status": "uploaded",
-                "command": "upload",
-                "file": filepath,
-                "remote_name": filename,
-                "bytes": filesize,
-                "uploaded": True,
-            })
+            emit_json(
+                {
+                    "status": "uploaded",
+                    "command": "upload",
+                    "file": filepath,
+                    "remote_name": filename,
+                    "bytes": filesize,
+                    "uploaded": True,
+                }
+            )
         return filename
     else:
         # 4 attempts mirrors upload_file.max_retries (3 retries + initial try)
@@ -403,24 +472,24 @@ def cmd_files(args, ctx=None):
     from bambu_cli.constants import EXIT_NETWORK_ERROR
     from bambu_cli.printer import get_printer
     from bambu_cli.utils import emit_json, emit_json_error
+
     ctx = ctx or RuntimeContext.from_globals(args)
     json_mode = bool(_namespace_get(args, "json", False))
     try:
         printer = get_printer()
-        files = printer.list_files('/model/')
+        files = printer.list_files("/model/")
         if files is None:
             raise Exception("Failed to list files via printer API")
-        remote_files = [
-            {"name": bambu._portable_basename(path), "path": path}
-            for path in files
-        ]
+        remote_files = [{"name": bambu._portable_basename(path), "path": path} for path in files]
         if json_mode:
-            emit_json({
-                "status": "ok",
-                "command": "files",
-                "count": len(remote_files),
-                "files": remote_files,
-            })
+            emit_json(
+                {
+                    "status": "ok",
+                    "command": "files",
+                    "count": len(remote_files),
+                    "files": remote_files,
+                }
+            )
             return
         if not files:
             logger.info("No files on printer.")
@@ -434,6 +503,7 @@ def cmd_files(args, ctx=None):
         emit_json_error(args, "files", EXIT_NETWORK_ERROR, message, failed_step="ftps", files=[])
         sys.exit(EXIT_NETWORK_ERROR)
 
+
 def cmd_print(args, ctx=None):
     """Start printing a file already on the printer."""
     from bambu_cli import bambu
@@ -442,7 +512,7 @@ def cmd_print(args, ctx=None):
     from bambu_cli.utils import emit_json, emit_json_error
 
     ctx = ctx or RuntimeContext.from_globals(args)
-    dry_run = getattr(args, 'dry_run', False)
+    dry_run = getattr(args, "dry_run", False)
     basename = str(args.file or "")
 
     if bambu._safe_remote_name(basename) is None:
@@ -465,27 +535,31 @@ def cmd_print(args, ctx=None):
     if not args.confirm and not dry_run:
         logger.warning("⚠️  This will START a print. Add --confirm to proceed.")
         if bool(_namespace_get(args, "json", False)):
-            emit_json({
-                "status": "confirmation_required",
-                "command": "print",
-                "file": basename,
-                "printed": False,
-                "next_command": bambu._print_next_command(args, basename),
-            })
+            emit_json(
+                {
+                    "status": "confirmation_required",
+                    "command": "print",
+                    "file": basename,
+                    "printed": False,
+                    "next_command": bambu._print_next_command(args, basename),
+                }
+            )
         return
 
     payload = bambu.generate_print_payload(
         basename,
-        use_ams=getattr(args, 'use_ams', False),
+        use_ams=getattr(args, "use_ams", False),
         ams_mapping=ams_mapping,
-        timelapse=getattr(args, 'timelapse', False),
-        bed_leveling=not getattr(args, 'skip_bed_leveling', False),
-        flow_cali=not getattr(args, 'skip_flow_cali', False)
+        timelapse=getattr(args, "timelapse", False),
+        bed_leveling=not getattr(args, "skip_bed_leveling", False),
+        flow_cali=not getattr(args, "skip_flow_cali", False),
     )
     try:
         from bambu_cli.printer import get_printer
+
         printer = get_printer()
         from bambu_cli import utils as _utils
+
         _utils._LAST_ERROR_PAYLOAD = None
         bambu.execute_print_command(printer, payload, basename, dry_run=dry_run)
     except SystemExit as exc:
@@ -504,19 +578,24 @@ def cmd_print(args, ctx=None):
         )
         raise
     if bool(_namespace_get(args, "json", False)):
-        emit_json({
-            "status": "dry_run_ok" if dry_run else "print_started",
-            "command": "print",
-            "file": basename,
-            "printed": not dry_run,
-            "dry_run": bool(dry_run),
-        })
+        emit_json(
+            {
+                "status": "dry_run_ok" if dry_run else "print_started",
+                "command": "print",
+                "file": basename,
+                "printed": not dry_run,
+                "dry_run": bool(dry_run),
+            }
+        )
     return basename
+
 
 def cmd_download(args):
     """Download a model file from a remote URL."""
     from bambu_cli import bambu
+
     return bambu._cmd_download(args)
+
 
 def cmd_delete(args, ctx=None):
     """Delete a file from the printer via FTPS."""
@@ -536,26 +615,30 @@ def cmd_delete(args, ctx=None):
     if not args.confirm:
         logger.warning(f"⚠️  This will DELETE '{filename}' from the printer. Add --confirm to proceed.")
         if bool(_namespace_get(args, "json", False)):
-            emit_json({
-                "status": "confirmation_required",
-                "command": "delete",
-                "file": filename,
-                "deleted": False,
-                "next_command": ["delete", filename, "--confirm", "--json"],
-            })
+            emit_json(
+                {
+                    "status": "confirmation_required",
+                    "command": "delete",
+                    "file": filename,
+                    "deleted": False,
+                    "next_command": ["delete", filename, "--confirm", "--json"],
+                }
+            )
         sys.exit(EXIT_COMMAND_ERROR)
 
     try:
         printer = get_printer()
-        if printer.delete_file(f'/model/{filename}'):
+        if printer.delete_file(f"/model/{filename}"):
             logger.info(f"🗑️  Deleted {filename} from printer")
             if bool(_namespace_get(args, "json", False)):
-                emit_json({
-                    "status": "deleted",
-                    "command": "delete",
-                    "file": filename,
-                    "deleted": True,
-                })
+                emit_json(
+                    {
+                        "status": "deleted",
+                        "command": "delete",
+                        "file": filename,
+                        "deleted": True,
+                    }
+                )
         else:
             raise Exception("Delete operation failed in printer client.")
     except Exception as e:
@@ -564,41 +647,45 @@ def cmd_delete(args, ctx=None):
         emit_json_error(args, "delete", EXIT_NETWORK_ERROR, message, failed_step="ftps", file=filename, deleted=False)
         sys.exit(EXIT_NETWORK_ERROR)
 
+
 def cmd_snapshot(args, ctx=None):
     """Capture a camera snapshot using the RTSP Streamer Docker container."""
     from bambu_cli import bambu
+
     ctx = ctx or RuntimeContext.from_globals(args)
     bambu._cmd_snapshot(args, ctx=ctx)
+
 
 def cmd_preflight(args):
     """Check local install/config readiness without contacting printer."""
     from bambu_cli import bambu
+
     bambu._cmd_preflight(args)
+
 
 def cmd_config(args):
     """Show the effective config (redacted) or validate it locally."""
     from bambu_cli import bambu
+
     bambu._cmd_config(args)
+
 
 def cmd_job(args):
     """One-shot URL/local file workflow: download, slice, upload, optionally print."""
     from bambu_cli import bambu
+
     return bambu._cmd_job(args)
+
 
 def cmd_gcode(args, ctx=None):
     """Send raw G-code to the printer via MQTT."""
     from bambu_cli.cli import _namespace_get
     from bambu_cli.constants import EXIT_NETWORK_ERROR
     from bambu_cli.utils import emit_json, emit_json_error
+
     ctx = ctx or RuntimeContext.from_globals(args)
     gcode = args.code
-    payload = json.dumps({
-        "print": {
-            "sequence_id": get_sequence_id(),
-            "command": "gcode_line",
-            "param": gcode
-        }
-    })
+    payload = json.dumps({"print": {"sequence_id": get_sequence_id(), "command": "gcode_line", "param": gcode}})
     printer = ctx.printer()
     if not printer.send_command(payload):
         message = "Failed to send G-code command."
@@ -607,12 +694,15 @@ def cmd_gcode(args, ctx=None):
         sys.exit(EXIT_NETWORK_ERROR)
     logger.info(f"📡 Sent: {gcode}")
     if bool(_namespace_get(args, "json", False)):
-        emit_json({
-            "status": "sent",
-            "command": "gcode",
-            "gcode": gcode,
-            "sent": True,
-        })
+        emit_json(
+            {
+                "status": "sent",
+                "command": "gcode",
+                "gcode": gcode,
+                "sent": True,
+            }
+        )
+
 
 def cmd_status(args, ctx=None):
     """Query and display the printer's current status."""
@@ -621,6 +711,7 @@ def cmd_status(args, ctx=None):
     from bambu_cli.errors import PrinterConnectionError
     from bambu_cli.protocols.mqtt import monitor_status
     from bambu_cli.utils import emit_json
+
     ctx = ctx or RuntimeContext.from_globals(args)
     if bool(_namespace_get(args, "monitor", False)):
         monitor_status(args)

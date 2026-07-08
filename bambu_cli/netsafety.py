@@ -2,6 +2,7 @@
 DNS caching, and redirect hop limiting. No dependency on Printables/model
 selection logic — this module is purely network-safety plumbing shared by
 the download package and printables.py."""
+
 import functools
 import http.client
 import ipaddress
@@ -58,6 +59,7 @@ def _get_safe_connection(host, port, timeout, source_address):
             if isinstance(ip_obj, ipaddress.IPv6Address) and ip_obj.ipv4_mapped:
                 ip_obj = ip_obj.ipv4_mapped
             from bambu_cli import bambu
+
             if not getattr(bambu, "ALLOW_PRIVATE_IPS", False) and not ip_obj.is_global:
                 logger.warning(f"Security Error: Refusing connection to non-public IP ({ip}) for {host}")
                 continue
@@ -126,10 +128,10 @@ class SafeHTTPHandler(urllib.request.HTTPHandler):
 class SafeHTTPSHandler(urllib.request.HTTPSHandler):
     def https_open(self, req):
         kwargs = {}
-        if hasattr(self, '_context'):
-            kwargs['context'] = self._context
-        if hasattr(self, '_check_hostname'):
-            kwargs['check_hostname'] = self._check_hostname
+        if hasattr(self, "_context"):
+            kwargs["context"] = self._context
+        if hasattr(self, "_check_hostname"):
+            kwargs["check_hostname"] = self._check_hostname
         return self.do_open(SafeHTTPSConnection, req, **kwargs)
 
 
@@ -144,8 +146,7 @@ def _default_user_agent():
         os_label = "Windows NT 10.0; Win64; x64"
     else:
         os_label = f"X11; Linux {machine}"
-    return (f"Mozilla/5.0 ({os_label}) AppleWebKit/537.36 "
-            f"(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+    return f"Mozilla/5.0 ({os_label}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
 
 def build_safe_opener():

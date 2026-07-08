@@ -1,4 +1,5 @@
 """The `config` command: show the effective config or validate it locally."""
+
 import json
 import os
 import sys
@@ -40,8 +41,15 @@ def _cmd_config_show(args):
     if not os.path.exists(config_path):
         message = f"Config not found at {_display_path(config_path)}. Run `setup` first."
         logger.error(message)
-        emit_json_error(args, "config", EXIT_CONFIG_ERROR, message, failed_step="config",
-                        action="show", config_path=_display_path(config_path))
+        emit_json_error(
+            args,
+            "config",
+            EXIT_CONFIG_ERROR,
+            message,
+            failed_step="config",
+            action="show",
+            config_path=_display_path(config_path),
+        )
         sys.exit(EXIT_CONFIG_ERROR)
     try:
         with open(config_path, encoding="utf-8") as f:
@@ -49,19 +57,28 @@ def _cmd_config_show(args):
     except (OSError, json.JSONDecodeError) as exc:
         message = f"Could not read config: {_exception_for_message(exc)}"
         logger.error(message)
-        emit_json_error(args, "config", EXIT_CONFIG_ERROR, message, failed_step="config",
-                        action="show", config_path=_display_path(config_path))
+        emit_json_error(
+            args,
+            "config",
+            EXIT_CONFIG_ERROR,
+            message,
+            failed_step="config",
+            action="show",
+            config_path=_display_path(config_path),
+        )
         sys.exit(EXIT_CONFIG_ERROR)
 
     redacted = _redacted_config(config)
     if _namespace_get(args, "json", False):
-        emit_json({
-            "status": "ok",
-            "command": "config",
-            "action": "show",
-            "config_path": _display_path(config_path),
-            "config": redacted,
-        })
+        emit_json(
+            {
+                "status": "ok",
+                "command": "config",
+                "action": "show",
+                "config_path": _display_path(config_path),
+                "config": redacted,
+            }
+        )
         return
     logger.info(f"📄 Config: {_display_path(config_path)}")
     print(json.dumps(redacted, indent=2))
@@ -82,18 +99,20 @@ def _cmd_config_validate(args):
         status = "warning"
 
     if _namespace_get(args, "json", False):
-        emit_json({
-            "status": status,
-            "command": "config",
-            "action": "validate",
-            "exit_code": exit_code,
-            "ok": ok,
-            "errors": error_count,
-            "warnings": warning_count,
-            "strict": bool(_namespace_get(args, "strict", False)),
-            "config_path": _display_path(_config_path()),
-            "checks": checks,
-        })
+        emit_json(
+            {
+                "status": status,
+                "command": "config",
+                "action": "validate",
+                "exit_code": exit_code,
+                "ok": ok,
+                "errors": error_count,
+                "warnings": warning_count,
+                "strict": bool(_namespace_get(args, "strict", False)),
+                "config_path": _display_path(_config_path()),
+                "checks": checks,
+            }
+        )
     else:
         logger.info(f"🧪 Validating {_display_path(_config_path())}")
         for check in checks:

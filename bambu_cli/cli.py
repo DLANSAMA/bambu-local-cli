@@ -30,13 +30,14 @@ def setup_logging(verbose=False, json_mode=False):
         from rich.console import Console
         from rich.logging import RichHandler
         from rich.traceback import install
+
         install(show_locals=False)
         console = Console(stderr=True)
         handler = RichHandler(console=console, rich_tracebacks=True, markup=True)
     except ImportError:
         stream = sys_module.stderr
         handler = logging_module.StreamHandler(stream)
-        formatter = logging_module.Formatter('%(levelname)s: %(message)s')
+        formatter = logging_module.Formatter("%(levelname)s: %(message)s")
         handler.setFormatter(formatter)
 
     level = logging_module.DEBUG if verbose else logging_module.INFO
@@ -50,8 +51,6 @@ def setup_logging(verbose=False, json_mode=False):
     logger.setLevel(level)
     logger.addHandler(handler)
     logging_module.getLogger("paho").setLevel(logging_module.WARNING)
-
-
 
 
 def _argv_json_requested(argv=None):
@@ -82,13 +81,15 @@ class JsonArgumentParser(argparse.ArgumentParser):
         if not _argv_json_requested():
             self.print_usage(sys.stderr)
             self.exit(EXIT_COMMAND_ERROR, f"{self.prog}: error: {message}\n")
-        emit_json({
-            "status": "error",
-            "command": _guess_command_from_argv(),
-            "failed_step": "parse",
-            "exit_code": EXIT_COMMAND_ERROR,
-            "error": message,
-        })
+        emit_json(
+            {
+                "status": "error",
+                "command": _guess_command_from_argv(),
+                "failed_step": "parse",
+                "exit_code": EXIT_COMMAND_ERROR,
+                "error": message,
+            }
+        )
         self.exit(EXIT_COMMAND_ERROR)
 
 
@@ -138,6 +139,7 @@ def _exception_for_message(exc):
             message = message.replace(str(path), _display_path(path))
     return message
 
+
 def _looks_like_schemeless_credential_url(value):
     """Detect userinfo-bearing URLs where the user omitted https://."""
     text = str(value or "")
@@ -160,7 +162,7 @@ def _redact_url_credentials(value):
     if "://" not in text and _looks_like_schemeless_credential_url(text):
         redacted = _redact_url_credentials(f"https://{text}")
         prefix = "https://"
-        return redacted[len(prefix):] if isinstance(redacted, str) and redacted.startswith(prefix) else redacted
+        return redacted[len(prefix) :] if isinstance(redacted, str) and redacted.startswith(prefix) else redacted
     if not parsed.scheme or not parsed.netloc or (parsed.username is None and parsed.password is None):
         return value
     host = parsed.hostname or ""
@@ -196,11 +198,21 @@ def _exit_code_from_system_exit(exc, default=EXIT_COMMAND_ERROR):
 def _add_job_arguments(parser):
     parser.add_argument("source", help="URL or local path to .stl/.step/.stp/.obj/.3mf/.gcode/.zip")
     parser.add_argument("--confirm", action="store_true", help="Confirm print start after upload")
-    parser.add_argument("--dry-run", action="store_true", help="No-side-effect validation; skip download/slice/upload/print")
+    parser.add_argument(
+        "--dry-run", action="store_true", help="No-side-effect validation; skip download/slice/upload/print"
+    )
     parser.add_argument("--upload-only", action="store_true", help="Upload the printable but do not start the print")
     parser.add_argument("--name", help="Save downloaded URL as filename before slicing/upload")
-    parser.add_argument("--output", help="Working/output directory for downloads, ZIP extraction, and sliced .3mf files (default: private temp dir)")
-    parser.add_argument("--max-download-mb", type=int, default=DEFAULT_MAX_DOWNLOAD_MB, help=f"Maximum URL download and ZIP extraction size in MB (default: {DEFAULT_MAX_DOWNLOAD_MB})")
+    parser.add_argument(
+        "--output",
+        help="Working/output directory for downloads, ZIP extraction, and sliced .3mf files (default: private temp dir)",
+    )
+    parser.add_argument(
+        "--max-download-mb",
+        type=int,
+        default=DEFAULT_MAX_DOWNLOAD_MB,
+        help=f"Maximum URL download and ZIP extraction size in MB (default: {DEFAULT_MAX_DOWNLOAD_MB})",
+    )
     parser.add_argument("--quality", default="standard", help="draft/standard/high (default: standard)")
     parser.add_argument("--filament", type=str, default="PLA Basic", help="Filament type (e.g. 'PLA Basic', 'PETG')")
     parser.add_argument("--infill", type=int, default=15, help="Infill density %% (default: 15)")
@@ -208,11 +220,17 @@ def _add_job_arguments(parser):
     parser.add_argument("--nozzle-temp", type=int, default=220, help="Nozzle temp °C (default: 220)")
     parser.add_argument("--bed-temp", type=int, default=60, help="Bed temp °C (default: 60)")
     parser.add_argument("--supports", action="store_true", help="Enable supports")
-    parser.add_argument("--support-type", choices=['tree', 'normal'], help="Support type: tree or normal")
+    parser.add_argument("--support-type", choices=["tree", "normal"], help="Support type: tree or normal")
     parser.add_argument("--support-interface-density", type=float, help="Support interface density %%")
-    parser.add_argument("--support-interface-pattern", choices=['rectilinear', 'concentric', 'honeycomb'], help="Support interface pattern")
+    parser.add_argument(
+        "--support-interface-pattern",
+        choices=["rectilinear", "concentric", "honeycomb"],
+        help="Support interface pattern",
+    )
     parser.add_argument("--walls", type=int, help="Number of walls/perimeters")
-    parser.add_argument("--wall-type", choices=['normal', 'classic', 'archaic'], help="Wall type: normal (arachne) or classic")
+    parser.add_argument(
+        "--wall-type", choices=["normal", "classic", "archaic"], help="Wall type: normal (arachne) or classic"
+    )
     parser.add_argument("--top-layers", type=int, help="Number of top layers")
     parser.add_argument("--bottom-layers", type=int, help="Number of bottom layers")
     parser.add_argument("--accel-wall", type=int, help="Inner wall acceleration (mm/s²)")
@@ -222,7 +240,9 @@ def _add_job_arguments(parser):
     parser.add_argument("--accel-first-layer", type=int, help="First-layer acceleration (mm/s²)")
     parser.add_argument("--copies", type=int, default=1, help="Number of copies to arrange on plate (default: 1)")
     parser.add_argument("--use-ams", action="store_true", help="Enable AMS")
-    parser.add_argument("--ams-mapping", type=str, help="AMS slot mapping with zero-or-positive indexes, e.g., '1' or '0,1,2'")
+    parser.add_argument(
+        "--ams-mapping", type=str, help="AMS slot mapping with zero-or-positive indexes, e.g., '1' or '0,1,2'"
+    )
     parser.add_argument("--timelapse", action="store_true", help="Enable timelapse")
     parser.add_argument("--skip-bed-leveling", action="store_true", help="Skip bed leveling")
     parser.add_argument("--skip-flow-cali", action="store_true", help="Skip flow calibration")
@@ -231,15 +251,39 @@ def _add_job_arguments(parser):
 
 def get_global_parser():
     global_parser = argparse.ArgumentParser(add_help=False)
-    global_parser.add_argument("-v", "--verbose", action="store_true", default=argparse.SUPPRESS, help="Enable debug logging")
+    global_parser.add_argument(
+        "-v", "--verbose", action="store_true", default=argparse.SUPPRESS, help="Enable debug logging"
+    )
     global_parser.add_argument("--sim", action="store_true", default=argparse.SUPPRESS, help="Enable simulation mode")
-    global_parser.add_argument("--json", action="store_true", default=argparse.SUPPRESS, help="Emit JSON for commands that support it; may appear before the subcommand")
-    global_parser.add_argument("--network-timeout", type=float, default=argparse.SUPPRESS, help="Timeout in seconds for general network communication")
-    global_parser.add_argument("--slicer-timeout", type=float, default=argparse.SUPPRESS, help="Timeout in seconds for the slicing process")
-    global_parser.add_argument("--command-timeout", type=float, default=argparse.SUPPRESS, help="Timeout in seconds for printer commands")
-    global_parser.add_argument("--upload-timeout", type=float, default=argparse.SUPPRESS, help="Timeout in seconds for file uploads")
-    global_parser.add_argument("--allow-private-ips", action="store_true", default=argparse.SUPPRESS, help="Allow fetching URLs that resolve to private or local network IP addresses")
+    global_parser.add_argument(
+        "--json",
+        action="store_true",
+        default=argparse.SUPPRESS,
+        help="Emit JSON for commands that support it; may appear before the subcommand",
+    )
+    global_parser.add_argument(
+        "--network-timeout",
+        type=float,
+        default=argparse.SUPPRESS,
+        help="Timeout in seconds for general network communication",
+    )
+    global_parser.add_argument(
+        "--slicer-timeout", type=float, default=argparse.SUPPRESS, help="Timeout in seconds for the slicing process"
+    )
+    global_parser.add_argument(
+        "--command-timeout", type=float, default=argparse.SUPPRESS, help="Timeout in seconds for printer commands"
+    )
+    global_parser.add_argument(
+        "--upload-timeout", type=float, default=argparse.SUPPRESS, help="Timeout in seconds for file uploads"
+    )
+    global_parser.add_argument(
+        "--allow-private-ips",
+        action="store_true",
+        default=argparse.SUPPRESS,
+        help="Allow fetching URLs that resolve to private or local network IP addresses",
+    )
     return global_parser
+
 
 def build_parser():
     parser = JsonArgumentParser(description="Bambu Lab local printer control", parents=[get_global_parser()])
@@ -247,8 +291,14 @@ def build_parser():
     sub = parser.add_subparsers(dest="cmd", parser_class=JsonArgumentParser)
 
     p_status = sub.add_parser("status", parents=[get_global_parser()], help="Get printer status")
-    p_status.add_argument("--json", action="store_true", help="Emit machine-readable status summary with raw printer data under \x27printer\x27")
-    p_status.add_argument("--wait", "--monitor", action="store_true", dest="monitor", help="Monitor print status until completion")
+    p_status.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit machine-readable status summary with raw printer data under \x27printer\x27",
+    )
+    p_status.add_argument(
+        "--wait", "--monitor", action="store_true", dest="monitor", help="Monitor print status until completion"
+    )
 
     p_light = sub.add_parser("light", parents=[get_global_parser()], help="Control chamber light")
     p_light.add_argument("action", choices=["on", "off"])
@@ -273,15 +323,23 @@ def build_parser():
     p_print.add_argument("--confirm", action="store_true", help="Confirm print start")
     p_print.add_argument("--dry-run", action="store_true", help="Validate file existence without printing")
     p_print.add_argument("--use-ams", action="store_true", help="Enable AMS")
-    p_print.add_argument("--ams-mapping", type=str, help="AMS slot mapping with zero-or-positive indexes, e.g., '1' or '0,1,2'")
+    p_print.add_argument(
+        "--ams-mapping", type=str, help="AMS slot mapping with zero-or-positive indexes, e.g., '1' or '0,1,2'"
+    )
     p_print.add_argument("--timelapse", action="store_true", help="Enable timelapse")
     p_print.add_argument("--skip-bed-leveling", action="store_true", help="Skip bed leveling")
     p_print.add_argument("--skip-flow-cali", action="store_true", help="Skip flow calibration")
 
-    p_job = sub.add_parser("job", parents=[get_global_parser()], help="One-shot URL/local file workflow: download, slice, upload, optionally print")
+    p_job = sub.add_parser(
+        "job",
+        parents=[get_global_parser()],
+        help="One-shot URL/local file workflow: download, slice, upload, optionally print",
+    )
     _add_job_arguments(p_job)
 
-    p_send = sub.add_parser("send", parents=[get_global_parser()], help="Alias for job, with agent-friendly URL/local file workflow")
+    p_send = sub.add_parser(
+        "send", parents=[get_global_parser()], help="Alias for job, with agent-friendly URL/local file workflow"
+    )
     _add_job_arguments(p_send)
 
     p_slice = sub.add_parser("slice", parents=[get_global_parser()], help="Slice a model file into .3mf")
@@ -293,11 +351,17 @@ def build_parser():
     p_slice.add_argument("--nozzle-temp", type=int, default=220, help="Nozzle temp °C (default: 220)")
     p_slice.add_argument("--bed-temp", type=int, default=60, help="Bed temp °C (default: 60)")
     p_slice.add_argument("--supports", action="store_true", help="Enable supports")
-    p_slice.add_argument("--support-type", choices=['tree', 'normal'], help="Support type: tree or normal")
+    p_slice.add_argument("--support-type", choices=["tree", "normal"], help="Support type: tree or normal")
     p_slice.add_argument("--support-interface-density", type=float, help="Support interface density %%")
-    p_slice.add_argument("--support-interface-pattern", choices=['rectilinear', 'concentric', 'honeycomb'], help="Support interface pattern")
+    p_slice.add_argument(
+        "--support-interface-pattern",
+        choices=["rectilinear", "concentric", "honeycomb"],
+        help="Support interface pattern",
+    )
     p_slice.add_argument("--walls", type=int, help="Number of walls/perimeters")
-    p_slice.add_argument("--wall-type", choices=['normal', 'classic', 'archaic'], help="Wall type: normal (arachne) or classic")
+    p_slice.add_argument(
+        "--wall-type", choices=["normal", "classic", "archaic"], help="Wall type: normal (arachne) or classic"
+    )
     p_slice.add_argument("--top-layers", type=int, help="Number of top layers")
     p_slice.add_argument("--bottom-layers", type=int, help="Number of bottom layers")
     p_slice.add_argument("--accel-wall", type=int, help="Inner wall acceleration (mm/s²)")
@@ -316,7 +380,12 @@ def build_parser():
     p_dl.add_argument("url", help="Printables page, simple HTML page, direct model/print URL, or ZIP URL")
     p_dl.add_argument("--name", help="Save as filename (default: from URL)")
     p_dl.add_argument("--output", help="Output directory (default: system temp dir)")
-    p_dl.add_argument("--max-download-mb", type=int, default=DEFAULT_MAX_DOWNLOAD_MB, help=f"Maximum download and ZIP extraction size in MB (default: {DEFAULT_MAX_DOWNLOAD_MB})")
+    p_dl.add_argument(
+        "--max-download-mb",
+        type=int,
+        default=DEFAULT_MAX_DOWNLOAD_MB,
+        help=f"Maximum download and ZIP extraction size in MB (default: {DEFAULT_MAX_DOWNLOAD_MB})",
+    )
 
     p_del = sub.add_parser("delete", parents=[get_global_parser()], help="Delete a file from printer")
     p_del.add_argument("file", help="Filename on printer to delete")
@@ -325,22 +394,43 @@ def build_parser():
     p_snap = sub.add_parser("snapshot", parents=[get_global_parser()], help="Capture camera snapshot")
     p_snap.add_argument("--output", help="Output file path (default: printer_snapshot.jpg)")
 
-    p_doc = sub.add_parser("doctor", parents=[get_global_parser()], help="Run health check and discover printer capabilities")
+    p_doc = sub.add_parser(
+        "doctor", parents=[get_global_parser()], help="Run health check and discover printer capabilities"
+    )
     p_doc.add_argument("--output", help="Path to write printer_capabilities.json (default: system temp dir)")
 
-    p_preflight = sub.add_parser("preflight", parents=[get_global_parser()], help="Check local install/config readiness without contacting printer")
+    p_preflight = sub.add_parser(
+        "preflight",
+        parents=[get_global_parser()],
+        help="Check local install/config readiness without contacting printer",
+    )
     p_preflight.add_argument("--strict", action="store_true", help="Treat warnings as failures")
 
-    p_config = sub.add_parser("config", parents=[get_global_parser()], help="Show the effective config (redacted) or validate it locally")
-    p_config.add_argument("action", choices=["show", "validate"], help="show: print config path and redacted contents; validate: run config checks")
+    p_config = sub.add_parser(
+        "config", parents=[get_global_parser()], help="Show the effective config (redacted) or validate it locally"
+    )
+    p_config.add_argument(
+        "action",
+        choices=["show", "validate"],
+        help="show: print config path and redacted contents; validate: run config checks",
+    )
     p_config.add_argument("--strict", action="store_true", help="validate: treat warnings as failures")
 
-    p_setup = sub.add_parser("setup", parents=[get_global_parser()], help="Guided or non-interactive setup to discover printer and create config")
+    p_setup = sub.add_parser(
+        "setup",
+        parents=[get_global_parser()],
+        help="Guided or non-interactive setup to discover printer and create config",
+    )
     p_setup.add_argument("--printer-ip", help="Printer IP address or hostname for non-interactive setup")
     p_setup.add_argument("--serial", help="Printer serial number for non-interactive setup")
-    p_setup.add_argument("--access-code", help="Printer access code value (prefer --access-code-env to avoid shell history)")
+    p_setup.add_argument(
+        "--access-code", help="Printer access code value (prefer --access-code-env to avoid shell history)"
+    )
     p_setup.add_argument("--access-code-env", help="Environment variable containing the printer access code")
-    p_setup.add_argument("--access-code-file", help="Existing access-code file, or destination when paired with --access-code/--access-code-env")
+    p_setup.add_argument(
+        "--access-code-file",
+        help="Existing access-code file, or destination when paired with --access-code/--access-code-env",
+    )
     p_setup.add_argument("--model", help="Printer model: P1P, P1S, X1C, X1, X1E, A1, A1M")
     p_setup.add_argument("--nozzle", help="Nozzle size: 0.2, 0.4, 0.6, 0.8")
     p_setup.add_argument("--orca-slicer", help="Path to OrcaSlicer executable")
@@ -348,14 +438,17 @@ def build_parser():
     p_setup.add_argument("--cert-fingerprint", help="SHA-256 fingerprint to pin the printer TLS certificate")
     p_setup.add_argument("--insecure-tls", action="store_true", help="Disable TLS verification entirely (last resort)")
     p_setup.add_argument("--scan-timeout", type=float, help="Custom duration for local printer network scanning")
-    p_setup.add_argument("--migrate-access-code", action="store_true", help="Move inline access_code into access_code_file and update config.json")
+    p_setup.add_argument(
+        "--migrate-access-code",
+        action="store_true",
+        help="Move inline access_code into access_code_file and update config.json",
+    )
 
     return parser
 
 
 def _json_mode_requested(args):
     return bool(getattr(args, "json", False))
-
 
 
 def _requires_printer_dns_check(args):
@@ -375,44 +468,52 @@ def _json_setup_should_be_noninteractive(args):
         and not sys.stdin.isatty()
     )
 
+
 def _setup_args_provided(args):
     return any(
         _namespace_get(args, attr) is not None
         for attr in ("printer_ip", "serial", "access_code", "access_code_env", "access_code_file", "model", "nozzle")
     )
 
+
 def _resolve_command(name):
     """Look up the cmd_* handler for a command through bambu_cli.bambu so
     tests that patch bambu.cmd_* (or bambu.cmd_job) still take effect."""
     func_name = "cmd_job" if name in ("job", "send") else f"cmd_{name}"
     from bambu_cli import bambu
+
     return getattr(bambu, func_name, None)
 
 
 def main():
     from bambu_cli import bambu
+
     utils._JSON_EMITTED = False
     utils._LAST_ERROR_PAYLOAD = None
     parser = build_parser()
     args = parser.parse_args()
     if getattr(args, "version", False):
         if bool(getattr(args, "json", False)):
-            emit_json({
-                "status": "ok",
-                "command": "version",
-                "version": bambu.VERSION,
-            })
+            emit_json(
+                {
+                    "status": "ok",
+                    "command": "version",
+                    "version": bambu.VERSION,
+                }
+            )
         else:
             print(f"bambu-cli {bambu.VERSION}")
         return
     if not args.cmd and bool(getattr(args, "json", False)):
-        emit_json({
-            "status": "error",
-            "command": "main",
-            "failed_step": "parse",
-            "exit_code": EXIT_COMMAND_ERROR,
-            "error": "Missing subcommand. Put --json with a command that supports it.",
-        })
+        emit_json(
+            {
+                "status": "error",
+                "command": "main",
+                "failed_step": "parse",
+                "exit_code": EXIT_COMMAND_ERROR,
+                "error": "Missing subcommand. Put --json with a command that supports it.",
+            }
+        )
         sys.exit(EXIT_COMMAND_ERROR)
 
     verbose_val = getattr(args, "verbose", False)
@@ -428,6 +529,7 @@ def main():
     bambu.load_config(exit_on_fail=False)
 
     from bambu_cli import context as _context
+
     _context.set_current(_context.RuntimeContext.from_globals(args))
 
     if _json_setup_should_be_noninteractive(args):
@@ -497,5 +599,6 @@ def main():
         parser.print_help(sys.stderr)
         sys.exit(EXIT_COMMAND_ERROR)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

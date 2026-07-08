@@ -1,6 +1,7 @@
 """Printables.com-specific model resolution: detect Printables model page
 URLs and resolve them to a direct downloadable file URL via the Printables
 GraphQL API."""
+
 import json
 import re
 import urllib.error
@@ -15,7 +16,7 @@ from bambu_cli.netsafety import _default_user_agent, build_safe_opener
 def _is_printables_model_url(value):
     parsed = urlparse(value)
     host = (parsed.hostname or "").lower()
-    return host in ("printables.com", "www.printables.com") and bool(re.search(r'/model/(\d+)', parsed.path))
+    return host in ("printables.com", "www.printables.com") and bool(re.search(r"/model/(\d+)", parsed.path))
 
 
 def _select_printables_file(files, file_desc, type_key="stl"):
@@ -23,7 +24,7 @@ def _select_printables_file(files, file_desc, type_key="stl"):
         logger.info(f"   Found {len(files)} {file_desc} files:")
         for s in files:
             logger.info(f"      • {s['name']} ({s.get('fileSize', 0) // 1024}KB)")
-    file_to_use = max(files, key=lambda x: x.get('fileSize', 0))
+    file_to_use = max(files, key=lambda x: x.get("fileSize", 0))
     logger.info(f"   → Using {file_desc}: {file_to_use['name']} ({file_to_use.get('fileSize', 0) // 1024}KB)")
     return file_to_use, type_key
 
@@ -31,12 +32,13 @@ def _select_printables_file(files, file_desc, type_key="stl"):
 def _get_printables_file_info(model_id, gql_headers, opener):
     """Helper to fetch file info from Printables API."""
 
-    payload = json.dumps({
-        "variables": {"id": model_id},
-        "query": "query($id: ID!){print(id: $id){name stls{name fileSize id} gcodes{name fileSize id}}}",
-    })
-    req = urllib.request.Request('https://api.printables.com/graphql/',
-        data=payload.encode(), headers=gql_headers)
+    payload = json.dumps(
+        {
+            "variables": {"id": model_id},
+            "query": "query($id: ID!){print(id: $id){name stls{name fileSize id} gcodes{name fileSize id}}}",
+        }
+    )
+    req = urllib.request.Request("https://api.printables.com/graphql/", data=payload.encode(), headers=gql_headers)
 
     file_type = "stl"
     try:
@@ -59,26 +61,26 @@ def _get_printables_file_info(model_id, gql_headers, opener):
         logger.error("Invalid Printables API response structure.")
         return None, None, None
 
-    model = result.get('data', {}).get('print')
+    model = result.get("data", {}).get("print")
     if not model:
         logger.error(f"Model #{model_id} not found on Printables")
         return None, None, None
 
-    stls_raw = model.get('stls', [])
-    gcodes_raw = model.get('gcodes', [])
+    stls_raw = model.get("stls", [])
+    gcodes_raw = model.get("gcodes", [])
 
     stls, steps, threemfs = [], [], []
     for s in stls_raw:
-        ext = s.get('name', '').lower().rpartition('.')[-1]
-        if ext == 'stl':
+        ext = s.get("name", "").lower().rpartition(".")[-1]
+        if ext == "stl":
             stls.append(s)
-        elif ext in ('step', 'stp'):
+        elif ext in ("step", "stp"):
             steps.append(s)
-        elif ext == '3mf':
+        elif ext == "3mf":
             threemfs.append(s)
     for g in gcodes_raw:
-        ext = g.get('name', '').lower().rpartition('.')[-1]
-        if ext == '3mf':
+        ext = g.get("name", "").lower().rpartition(".")[-1]
+        if ext == "3mf":
             threemfs.append(g)
 
     logger.info(f"   Model: {model.get('name', '?')}")
@@ -88,37 +90,38 @@ def _get_printables_file_info(model_id, gql_headers, opener):
         file_to_use, file_type = _select_printables_file(steps, "STEP", "stl")
     elif threemfs:
         logger.warning("   ⚠️  No STL/STEP files — falling back to 3MF (cannot re-slice with custom settings)")
-        file_to_use = max(threemfs, key=lambda x: x.get('fileSize', 0))
+        file_to_use = max(threemfs, key=lambda x: x.get("fileSize", 0))
         file_type = "gcode" if file_to_use in gcodes_raw else "stl"
         logger.info(f"   → Using 3MF: {file_to_use['name']} ({file_to_use.get('fileSize', 0) // 1024}KB)")
     else:
         logger.error("No STL, STEP, or 3MF files found for this model")
         return None, None, None
 
-    return file_to_use['id'], file_type, file_to_use['name']
+    return file_to_use["id"], file_type, file_to_use["name"]
 
 
 def _get_printables_download_link(file_id, model_id, file_type, stl_name, gql_headers, opener):
     """Helper to fetch download link from Printables API."""
 
-    payload = json.dumps({
-        "operationName": "GetDownloadLink",
-        "variables": {"id": file_id, "printId": model_id, "source": "model_detail", "fileType": file_type},
-        "query": "mutation GetDownloadLink($id: ID!, $printId: ID!, $source: DownloadSourceEnum!, $fileType: DownloadFileTypeEnum!) { getDownloadLink(id: $id, printId: $printId, source: $source, fileType: $fileType) { ok output { link } errors { field messages } } }"
-    })
-    req = urllib.request.Request('https://api.printables.com/graphql/',
-        data=payload.encode(), headers=gql_headers)
+    payload = json.dumps(
+        {
+            "operationName": "GetDownloadLink",
+            "variables": {"id": file_id, "printId": model_id, "source": "model_detail", "fileType": file_type},
+            "query": "mutation GetDownloadLink($id: ID!, $printId: ID!, $source: DownloadSourceEnum!, $fileType: DownloadFileTypeEnum!) { getDownloadLink(id: $id, printId: $printId, source: $source, fileType: $fileType) { ok output { link } errors { field messages } } }",
+        }
+    )
+    req = urllib.request.Request("https://api.printables.com/graphql/", data=payload.encode(), headers=gql_headers)
 
     try:
         with opener.open(req, timeout=DEFAULT_NETWORK_TIMEOUT) as resp:
             result = json.loads(resp.read())
-            dl = result.get('data', {}).get('getDownloadLink', {})
-            if dl.get('ok') and dl.get('output', {}).get('link'):
-                download_url = dl['output']['link']
+            dl = result.get("data", {}).get("getDownloadLink", {})
+            if dl.get("ok") and dl.get("output", {}).get("link"):
+                download_url = dl["output"]["link"]
                 return download_url, stl_name
             else:
-                errs = dl.get('errors', [])
-                msg = errs[0]['messages'][0] if errs else 'unknown error'
+                errs = dl.get("errors", [])
+                msg = errs[0]["messages"][0] if errs else "unknown error"
                 logger.error(f"Failed to get download link: {msg}")
                 return None, None
     except urllib.error.URLError as e:
@@ -136,7 +139,7 @@ def resolve_printables_url(url):
     if not _is_printables_model_url(url):
         return None, None
 
-    printables_match = re.search(r'/model/(\d+)', urlparse(url).path)
+    printables_match = re.search(r"/model/(\d+)", urlparse(url).path)
     if not printables_match:
         return None, None
 
@@ -144,12 +147,15 @@ def resolve_printables_url(url):
     logger.info(f"🔍 Detected Printables model #{model_id}, resolving files...")
 
     headers = {
-        'User-Agent': _default_user_agent(),
-        'Accept': '*/*',
+        "User-Agent": _default_user_agent(),
+        "Accept": "*/*",
     }
-    gql_headers = {**headers, 'Content-Type': 'application/json',
-                   'Origin': 'https://www.printables.com',
-                   'Referer': 'https://www.printables.com/'}
+    gql_headers = {
+        **headers,
+        "Content-Type": "application/json",
+        "Origin": "https://www.printables.com",
+        "Referer": "https://www.printables.com/",
+    }
 
     opener = build_safe_opener()
     file_id, file_type, stl_name = _get_printables_file_info(model_id, gql_headers, opener)

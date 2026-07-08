@@ -1,4 +1,5 @@
 """Filename and extension helpers for downloads and printer-side files."""
+
 import email.message
 import email.utils
 import os
@@ -66,7 +67,7 @@ def _download_target_filename(args, url, resolved_name=None):
 def _sanitize_download_filename(filename):
     filename = _portable_basename(filename)
     filename = re.sub(r'[\x00-\x1f<>:"/\\|?*]', "_", filename).strip(" .")
-    if filename in ('.', '..') or not filename:
+    if filename in (".", "..") or not filename:
         return "model.stl"
     stem, ext = os.path.splitext(filename)
     if stem.upper() in WINDOWS_RESERVED_FILENAMES:
@@ -106,11 +107,11 @@ def _safe_remote_name(filename):
     storage and cross-platform agent workflows should use portable filenames.
     Returns the name unchanged if safe, else ``None``.
     """
-    if not filename or filename in ('.', '..'):
+    if not filename or filename in (".", ".."):
         return None
     if filename != _portable_basename(filename):
         return None
-    if any(c in filename for c in ('\r', '\n', '\0')):
+    if any(c in filename for c in ("\r", "\n", "\0")):
         return None
     if any(c in filename for c in '<>:"/\\|?*'):
         return None

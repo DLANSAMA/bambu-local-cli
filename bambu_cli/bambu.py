@@ -34,6 +34,7 @@ forwarder, so ``from bambu_cli import bambu`` remains a stable facade for
 tests and scripts, and so runtime state can be patched in one place
 (``bambu.SIMULATION_MODE``, ``bambu.PRINTER_IP``, ...).
 """
+
 import importlib
 import logging
 import sys
@@ -70,7 +71,7 @@ CAMERA_STREAM_URL = ""
 # Logging
 logger = logging.getLogger("bambu")
 # Default config for top-level calls before main()
-logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s', stream=sys.stderr)
+logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s", stream=sys.stderr)
 
 
 def _redacted_serial():
@@ -85,12 +86,23 @@ def _redacted_serial():
 from bambu_cli.cli import main
 
 _FACADE_MODULES = (
-    "bambu_cli.constants", "bambu_cli.cli", "bambu_cli.config",
-    "bambu_cli.slicer", "bambu_cli.download", "bambu_cli.netsafety",
-    "bambu_cli.printables", "bambu_cli.job",
-    "bambu_cli.setup_cmd", "bambu_cli.camera", "bambu_cli.commands",
-    "bambu_cli.utils", "bambu_cli.errors", "bambu_cli.context",
-    "bambu_cli.printer", "bambu_cli.protocols.ftps", "bambu_cli.protocols.mqtt",
+    "bambu_cli.constants",
+    "bambu_cli.cli",
+    "bambu_cli.config",
+    "bambu_cli.slicer",
+    "bambu_cli.download",
+    "bambu_cli.netsafety",
+    "bambu_cli.printables",
+    "bambu_cli.job",
+    "bambu_cli.setup_cmd",
+    "bambu_cli.camera",
+    "bambu_cli.commands",
+    "bambu_cli.utils",
+    "bambu_cli.errors",
+    "bambu_cli.context",
+    "bambu_cli.printer",
+    "bambu_cli.protocols.ftps",
+    "bambu_cli.protocols.mqtt",
 )
 
 

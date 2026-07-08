@@ -1,4 +1,5 @@
 """ZIP archive detection and safe single-member model extraction."""
+
 import os
 import zipfile
 from urllib.parse import unquote, urlparse
@@ -37,10 +38,9 @@ def _is_zip_content_type(content_type):
 
 def _is_archive_download(url, filename=None, content_type=None):
     values = [filename, unquote(urlparse(url).path)]
-    return (
-        any(_file_extension(_portable_basename(value or "")) in ARCHIVE_DOWNLOAD_EXTENSIONS for value in values)
-        or _is_zip_content_type(content_type)
-    )
+    return any(
+        _file_extension(_portable_basename(value or "")) in ARCHIVE_DOWNLOAD_EXTENSIONS for value in values
+    ) or _is_zip_content_type(content_type)
 
 
 def _select_zip_model_member(archive):
@@ -67,6 +67,7 @@ def _extract_zip_model(zip_path, outdir, args):
     # Collision avoidance is looked up on the package so existing
     # ``bambu_cli.download._noncolliding_path`` test patches keep working.
     from bambu_cli import download as _download_pkg
+
     try:
         with zipfile.ZipFile(zip_path) as archive:
             info, member_filename = _select_zip_model_member(archive)

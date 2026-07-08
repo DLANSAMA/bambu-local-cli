@@ -15,10 +15,12 @@ def _ensure_output_dir(path):
     import sys
 
     from bambu_cli.logging_utils import logger
+
     try:
         _secure_makedirs(path, exist_ok=True)
     except OSError as e:
         from bambu_cli.cli import _exception_for_message, _path_for_message
+
         logger.error(f"Could not create output directory {_path_for_message(path)}: {_exception_for_message(e)}")
         sys.exit(EXIT_FILE_ERROR)
 
@@ -26,6 +28,7 @@ def _ensure_output_dir(path):
 def _ensure_parent_dir(path):
     """Create the parent directory for an output file when one was supplied."""
     from bambu_cli.cli import _expand_path
+
     parent = os.path.dirname(_expand_path(path))
     if parent:
         _ensure_output_dir(parent)
@@ -46,15 +49,17 @@ _JSON_PATH_KEYS = {
     "profiles_dir",
     "workdir",
     "detail",
-    "details"
+    "details",
 }
 
 _JSON_EMITTED = False
 _LAST_ERROR_PAYLOAD = None
 _LAST_DOWNLOAD_PAYLOAD = None
 
+
 def _redact_url_credentials(url):
     from urllib.parse import urlparse, urlunparse
+
     try:
         parsed = urlparse(url)
         if parsed.password:
@@ -67,13 +72,15 @@ def _redact_url_credentials(url):
         pass
     return url
 
+
 def _display_path(path):
     if not path:
         return path
     home = os.path.expanduser("~")
     if path.startswith(home):
-        return "~" + path[len(home):]
+        return "~" + path[len(home) :]
     return path
+
 
 def _compact_all_strings(val):
     if isinstance(val, dict):
@@ -84,6 +91,7 @@ def _compact_all_strings(val):
         redacted = _redact_url_credentials(val)
         return redacted if redacted != val else _display_path(val)
     return val
+
 
 def _json_display_paths(value):
     if isinstance(value, dict):
@@ -103,13 +111,16 @@ def _json_display_paths(value):
         return _redact_url_credentials(value)
     return value
 
+
 def emit_json(data):
     global _JSON_EMITTED
     _JSON_EMITTED = True
     print(json.dumps(_json_display_paths(data), indent=2))
 
+
 def _namespace_get(args, key, default=None):
     return getattr(args, key, default)
+
 
 def emit_json_error(args, command, exit_code, error, failed_step=None, **extra):
     global _JSON_EMITTED
@@ -129,6 +140,7 @@ def emit_json_error(args, command, exit_code, error, failed_step=None, **extra):
         return
     emit_json(payload)
 
+
 def record_error_detail(command, exit_code, error, failed_step=None, **extra):
     global _LAST_ERROR_PAYLOAD
     payload = {
@@ -142,11 +154,13 @@ def record_error_detail(command, exit_code, error, failed_step=None, **extra):
     payload.update(extra)
     _LAST_ERROR_PAYLOAD = payload
 
+
 def _record_download_success(args, payload):
     global _LAST_DOWNLOAD_PAYLOAD
     _LAST_DOWNLOAD_PAYLOAD = payload
     if bool(_namespace_get(args, "json", False)):
         emit_json(payload)
+
 
 import socket
 import threading
@@ -158,8 +172,9 @@ def _resolve_ip(host, timeout=5.0):
     """
     if not host or host == "0.0.0.0":
         return host
-    
+
     result = [host]
+
     def _resolve():
         try:
             addr_info = socket.getaddrinfo(host, None)
@@ -167,14 +182,16 @@ def _resolve_ip(host, timeout=5.0):
                 result[0] = addr_info[0][4][0]
         except Exception:
             pass
-            
+
     t = threading.Thread(target=_resolve)
     t.daemon = True
     t.start()
     t.join(timeout)
     return result[0]
 
+
 _sequence_counter = 0
+
 
 def get_sequence_id():
     global _sequence_counter

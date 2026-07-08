@@ -39,7 +39,7 @@ class _SimFtp:
         size = fp.tell()
         fp.seek(current)
         _SIM_FTP_FILES[filename] = size
-        
+
         # Simulate upload progress blocks
         if callback:
             callback(b"\x00" * size)
@@ -57,6 +57,7 @@ class _SimFtp:
 def _verify_cert_fingerprint(der_cert, host):
     """Raise ssl.SSLError if the presented cert doesn't match the pinned fingerprint."""
     from bambu_cli import bambu
+
     expected = bambu._expected_fingerprint()
     if not expected:
         return
@@ -64,23 +65,25 @@ def _verify_cert_fingerprint(der_cert, host):
     if actual is None:
         raise ssl.SSLError(f"cert_fingerprint is set but {host} presented no certificate")
     if actual.lower() != expected:
-        raise ssl.SSLError(
-            f"Certificate fingerprint mismatch for {host}: "
-            f"expected {expected}, got {actual.lower()}")
+        raise ssl.SSLError(f"Certificate fingerprint mismatch for {host}: expected {expected}, got {actual.lower()}")
 
 
 class ImplicitFTPS(ftplib.FTP_TLS):
     """FTP_TLS subclass for implicit FTPS (Bambu printers use port 990)."""
-    def connect(self, host='', port=990, timeout=-999, source_address=None):
-        if host != '': self.host = host
-        if port > 0: self.port = port
-        if timeout != -999: self.timeout = timeout
+
+    def connect(self, host="", port=990, timeout=-999, source_address=None):
+        if host != "":
+            self.host = host
+        if port > 0:
+            self.port = port
+        if timeout != -999:
+            self.timeout = timeout
         self.sock = socket.create_connection((self.host, self.port), self.timeout)
         self.af = self.sock.family
         try:
             ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-            pin = getattr(self, 'printer', None) and self.printer.cert_fingerprint
-            if pin or (getattr(self, 'printer', None) and self.printer.insecure_tls):
+            pin = getattr(self, "printer", None) and self.printer.cert_fingerprint
+            if pin or (getattr(self, "printer", None) and self.printer.insecure_tls):
                 ctx.check_hostname = False
                 ctx.verify_mode = ssl.CERT_NONE
             else:
@@ -92,10 +95,10 @@ class ImplicitFTPS(ftplib.FTP_TLS):
                 actual = hashlib.sha256(self.sock.getpeercert(binary_form=True)).hexdigest().lower()
                 if actual != pin.lower():
                     raise ssl.SSLError(f"Certificate fingerprint mismatch: expected {pin.lower()}, got {actual}")
-            self.file = self.sock.makefile('r', encoding=self.encoding)
+            self.file = self.sock.makefile("r", encoding=self.encoding)
             self.welcome = self.getresp()
         except Exception:
-            if hasattr(self, 'file') and self.file:
+            if hasattr(self, "file") and self.file:
                 try:
                     self.file.close()
                 except Exception:
@@ -112,10 +115,8 @@ class ImplicitFTPS(ftplib.FTP_TLS):
         secure = getattr(self, "_secure_data", False) or getattr(self, "_prot_p", False)
         if secure and isinstance(self.sock, ssl.SSLSocket):
             session = self.sock.session
-            conn = self.sock.context.wrap_socket(conn,
-                                                 server_hostname=self.host,
-                                                 session=session)
-            pin = getattr(self, 'printer', None) and self.printer.cert_fingerprint
+            conn = self.sock.context.wrap_socket(conn, server_hostname=self.host, session=session)
+            pin = getattr(self, "printer", None) and self.printer.cert_fingerprint
             if pin:
                 actual = hashlib.sha256(conn.getpeercert(binary_form=True)).hexdigest().lower()
                 if actual != pin.lower():
@@ -149,13 +150,14 @@ def _download_partial_path(outpath):
 
 def _noncolliding_path(path):
     from bambu_cli.cli import _path_for_message
+
     try:
         fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
         os.close(fd)
         return path
     except FileExistsError:
         pass
-        
+
     directory = os.path.dirname(path)
     basename = os.path.basename(path)
     stem, ext = os.path.splitext(basename)
@@ -182,6 +184,7 @@ class PooledFTPWrapper:
     def __enter__(self):
         self._manager._ftp_usage_lock.acquire()
         return self
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         try:
             if exc_type is not None:
@@ -198,6 +201,7 @@ class PooledFTPWrapper:
 
 class ConnectionManager:
     """Manages reusable MQTT and FTPS connections to reduce socket churn."""
+
     def __init__(self):
         self._mqtt_client = None
         self._ftp_client = None
@@ -207,6 +211,7 @@ class ConnectionManager:
     def get_ftp(self, printer=None, timeout=60):
         if printer is None:
             from bambu_cli.printer import get_printer
+
             printer = get_printer()
         with self._lock:
             client = self._ftp_client
@@ -256,15 +261,16 @@ def _create_raw_ftp(printer, timeout=60):
     """Connect to printer's FTPS server."""
     if printer.simulation_mode:
         from bambu_cli.logging_utils import logger
+
         logger.info("🤖 [SIM] Connecting to simulated FTPS server...")
         return _SimFtp()
 
     resolved_ip = _resolve_ip(printer.ip)
     ftp = ImplicitFTPS()
-    
+
     # Store settings for use in connect/ntransfercmd
     ftp.printer = printer
-    
+
     ftp.connect(resolved_ip, 990, timeout=timeout)
     ftp.login("bblp", printer.access_code)
     ftp.prot_p()

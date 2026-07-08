@@ -1,4 +1,5 @@
 """Migrate an inline access_code from config.json into a separate secret file."""
+
 import json
 import os
 import sys

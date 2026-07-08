@@ -1,4 +1,5 @@
 """URL normalization/validation and download safety-limit checks."""
+
 import os
 import re
 import sys
@@ -172,7 +173,9 @@ def _validate_max_download_mb_or_exit(args, command="download"):
     return max_download_mb * 1024 * 1024
 
 
-def _reject_oversized_download(args, source_url, normalized_source, url, outpath, received_bytes, max_bytes, content_length=None):
+def _reject_oversized_download(
+    args, source_url, normalized_source, url, outpath, received_bytes, max_bytes, content_length=None
+):
     limit_mb = max_bytes // (1024 * 1024)
     if content_length is not None:
         message = f"Download is too large: {content_length} bytes exceeds the {limit_mb} MB safety limit."

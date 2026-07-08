@@ -1,4 +1,5 @@
 """The `setup` command: guided/non-interactive config creation and mDNS discovery."""
+
 import os
 import re
 import socket
@@ -58,7 +59,7 @@ def _service_info_address(info):
 
 def _parse_mdns_printer_identity(name):
     """Return (serial, model) from a Bambu mDNS service name."""
-    match = re.search(r'BBLP-([^._]+)', name, re.IGNORECASE)
+    match = re.search(r"BBLP-([^._]+)", name, re.IGNORECASE)
     service_id = match.group(1).upper() if match else ""
     detected_model = "P1P"
     serial = service_id or "YOUR_SERIAL"
@@ -70,7 +71,7 @@ def _parse_mdns_printer_identity(name):
             break
         if service_id.startswith(prefix):
             detected_model = model
-            serial = service_id[len(prefix):] or "YOUR_SERIAL"
+            serial = service_id[len(prefix) :] or "YOUR_SERIAL"
             break
 
     return serial, detected_model
@@ -78,6 +79,7 @@ def _parse_mdns_printer_identity(name):
 
 def _cmd_setup_noninteractive(args):
     from bambu_cli.config import _DEFAULT_ORCA, _DEFAULT_PROFILES
+
     ip = _namespace_get(args, "printer_ip")
     serial = _namespace_get(args, "serial")
     access_code = _namespace_get(args, "access_code")
@@ -128,15 +130,21 @@ def _cmd_setup_noninteractive(args):
             sys.exit(EXIT_CONFIG_ERROR)
         if access_code_problem:
             logger.error(access_code_problem)
-            _setup_json_error(args, access_code_problem, **_setup_path_details(access_code_file=expanded_access_code_file))
+            _setup_json_error(
+                args, access_code_problem, **_setup_path_details(access_code_file=expanded_access_code_file)
+            )
             sys.exit(EXIT_CONFIG_ERROR)
 
     placeholder_errors = []
     if _looks_like_placeholder(ip, {"0.0.0.0", "192.168.0.XXX", "PRINTER_IP", "USER_PROVIDED_IP"}):
         placeholder_errors.append("--printer-ip")
-    if _looks_like_placeholder(serial, {"UNKNOWN", "YOUR_SERIAL", "YOUR_PRINTER_SERIAL", "USER_PROVIDED_SERIAL", "<REDACTED>"}):
+    if _looks_like_placeholder(
+        serial, {"UNKNOWN", "YOUR_SERIAL", "YOUR_PRINTER_SERIAL", "USER_PROVIDED_SERIAL", "<REDACTED>"}
+    ):
         placeholder_errors.append("--serial")
-    if access_code and _looks_like_placeholder(access_code, {"ACCESS_CODE", "YOUR_ACCESS_CODE", "USER_PROVIDED_ACCESS_CODE"}):
+    if access_code and _looks_like_placeholder(
+        access_code, {"ACCESS_CODE", "YOUR_ACCESS_CODE", "USER_PROVIDED_ACCESS_CODE"}
+    ):
         placeholder_errors.append("--access-code/--access-code-env")
     if placeholder_errors:
         message = (
@@ -186,6 +194,7 @@ def _cmd_setup(args):
     """Guided setup to discover printer and generate config."""
     from bambu_cli.config import _DEFAULT_ORCA, _DEFAULT_PROFILES
     from bambu_cli.setup_cmd.migrate import _cmd_migrate_access_code
+
     if _namespace_get(args, "migrate_access_code", False):
         _cmd_migrate_access_code(args)
         return
@@ -208,7 +217,7 @@ def _cmd_setup(args):
         logger.warning("⚠️  'zeroconf' package is not installed; network printer auto-discovery is disabled.")
         logger.info("   To enable auto-discovery, run: python -m pip install -r requirements.txt")
         choice = _prompt_text("Would you like to perform a manual configuration instead? [Y/n]: ", args).lower()
-        if choice in ('', 'y', 'yes'):
+        if choice in ("", "y", "yes"):
             use_manual = True
         else:
             sys.exit(EXIT_CONFIG_ERROR)
@@ -237,8 +246,12 @@ def _cmd_setup(args):
                         seen_services.add(service_key)
                         discovered.append({"name": name, "ip": ip, "info": info})
                     logger.info(f"   ✨ Found: {name} at {ip}")
-            def update_service(self, zc, type_, name): pass
-            def remove_service(self, zc, type_, name): pass
+
+            def update_service(self, zc, type_, name):
+                pass
+
+            def remove_service(self, zc, type_, name):
+                pass
 
         zc = None
         browser = None
@@ -307,8 +320,10 @@ def _cmd_setup(args):
         # as the MQTT serial.
         serial, detected_model = _parse_mdns_printer_identity(selected["name"])
 
-        logger.warning(f"⚠️  Printer discovered via unauthenticated mDNS. Verify that the reported IP "
-                       f"({selected['ip']}) belongs to your actual printer to protect your access code!")
+        logger.warning(
+            f"⚠️  Printer discovered via unauthenticated mDNS. Verify that the reported IP "
+            f"({selected['ip']}) belongs to your actual printer to protect your access code!"
+        )
         logger.info(f"\nConfiguring {selected['name']}...")
     else:
         logger.info("\nConfiguring manual printer...")
@@ -318,13 +333,15 @@ def _cmd_setup(args):
     logger.info(f"Printer model detected: {detected_model}")
     model_input = _normalize_model(
         _prompt_text(f"Confirm printer model (P1P/P1S/X1C/X1E/X1/A1/A1M) [default: {detected_model}]: ", args),
-        detected_model)
+        detected_model,
+    )
     nozzle_input = _normalize_nozzle(_prompt_text("Enter nozzle size (0.2, 0.4, 0.6, 0.8) [default: 0.4]: ", args))
     access_code_file = _prompt_access_code_file_path(args)
     _validate_setup_access_code_file(args, access_code_file)
 
     try:
         from bambu_cli.protocols.mqtt import probe_cert_fingerprint
+
         logger.info("🔒 Fetching printer TLS certificate fingerprint...")
         # Assumes the printer serves the same certificate on ports 8883 (MQTT),
         # 990 (FTPS), and 6000 (camera) — true for Bambu firmware to date.

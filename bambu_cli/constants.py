@@ -31,11 +31,11 @@ MAX_DOWNLOAD_FILENAME_LENGTH = 160
 DNS_CACHE_TTL = 300
 
 # File-type tables
-BED_PLATE_TYPES = ['cool_plate_temp', 'hot_plate_temp', 'textured_plate_temp', 'eng_plate_temp']
-SLICEABLE_EXTENSIONS = ('.stl', '.step', '.stp', '.obj')
-PRINT_READY_EXTENSIONS = ('.3mf', '.gcode')
+BED_PLATE_TYPES = ["cool_plate_temp", "hot_plate_temp", "textured_plate_temp", "eng_plate_temp"]
+SLICEABLE_EXTENSIONS = (".stl", ".step", ".stp", ".obj")
+PRINT_READY_EXTENSIONS = (".3mf", ".gcode")
 DOWNLOADABLE_EXTENSIONS = SLICEABLE_EXTENSIONS + PRINT_READY_EXTENSIONS
-ARCHIVE_DOWNLOAD_EXTENSIONS = ('.zip',)
+ARCHIVE_DOWNLOAD_EXTENSIONS = (".zip",)
 DOWNLOAD_CANDIDATE_EXTENSIONS = DOWNLOADABLE_EXTENSIONS + ARCHIVE_DOWNLOAD_EXTENSIONS
 DOWNLOAD_LINK_EXTENSION_PRIORITY = {
     ".stl": 0,
@@ -47,9 +47,20 @@ DOWNLOAD_LINK_EXTENSION_PRIORITY = {
     ".zip": 5,
 }
 KNOWN_UNSUPPORTED_DOWNLOAD_EXTENSIONS = {
-    ".rar", ".7z", ".tar", ".gz", ".bz2", ".xz",
-    ".pdf", ".txt",
-    ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg",
+    ".rar",
+    ".7z",
+    ".tar",
+    ".gz",
+    ".bz2",
+    ".xz",
+    ".pdf",
+    ".txt",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".webp",
+    ".svg",
 }
 KNOWN_UNSUPPORTED_CONTENT_TYPES = {
     "application/json",
@@ -64,15 +75,30 @@ KNOWN_UNSUPPORTED_CONTENT_TYPES = {
     "text/xml",
 }
 WINDOWS_RESERVED_FILENAMES = {
-    "CON", "PRN", "AUX", "NUL",
+    "CON",
+    "PRN",
+    "AUX",
+    "NUL",
     *(f"COM{i}" for i in range(1, 10)),
     *(f"LPT{i}" for i in range(1, 10)),
 }
 
 # Command routing sets
 PRINTER_CONFIG_COMMANDS = {
-    "status", "light", "pause", "resume", "stop", "upload", "files",
-    "print", "job", "send", "delete", "snapshot", "gcode", "doctor",
+    "status",
+    "light",
+    "pause",
+    "resume",
+    "stop",
+    "upload",
+    "files",
+    "print",
+    "job",
+    "send",
+    "delete",
+    "snapshot",
+    "gcode",
+    "doctor",
 }
 LOCAL_COMMANDS = {"slice", "download", "preflight", "setup", "config"}
 PRINTER_NETWORK_COMMANDS = PRINTER_CONFIG_COMMANDS - LOCAL_COMMANDS

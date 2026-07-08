@@ -8,6 +8,7 @@ targets like ``bambu_cli.download._noncolliding_path`` keep working;
 (``build_safe_opener``, ``resolve_printables_url``, ``_noncolliding_path``)
 through this namespace.
 """
+
 import socket  # noqa: F401 -- re-exported for test compat (download.socket patching)
 
 from bambu_cli.download.downloader import (  # noqa: F401
