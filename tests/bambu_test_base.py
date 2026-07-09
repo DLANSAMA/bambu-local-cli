@@ -73,7 +73,7 @@ def install_baseline_context():
     )
 
 
-bambu.load_config(exit_on_fail=False)
+_config_mod.load_config(exit_on_fail=False)
 install_baseline_context()
 
 import contextlib as _contextlib

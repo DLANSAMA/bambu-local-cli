@@ -17,8 +17,12 @@ import shutil
 import subprocess
 from typing import IO, TYPE_CHECKING, Any
 
+from bambu_cli.cli import _display_path, _exception_for_message, _expand_path, _path_for_message
+from bambu_cli.config import MODEL_MAPPING, get_slicer_timeout
 from bambu_cli.download.naming import _portable_basename
 from bambu_cli.logging_utils import logger
+from bambu_cli.protocols.ftps import _remove_partial_file
+from bambu_cli.utils import _ensure_output_dir
 
 if TYPE_CHECKING:
     from bambu_cli.context import Settings
@@ -39,27 +43,22 @@ def _profiles_dir_diagnostic(profiles_dir):
     configured one is unusable. Mirrors the binary-missing detection hint so
     profile errors are just as actionable, including in ``--json`` mode.
     """
-    from bambu_cli import bambu
     from bambu_cli.config import detect_profiles_dir
 
     detected = detect_profiles_dir()
     if detected and detected != profiles_dir:
-        hint = (
-            f"Detected OrcaSlicer profiles at {bambu._display_path(detected)} — "
-            'set "profiles_dir" to this in config.json.'
-        )
+        hint = f'Detected OrcaSlicer profiles at {_display_path(detected)} — set "profiles_dir" to this in config.json.'
         return hint, detected
     return None, detected
 
 
 def _slicer_executable_problem(path: str | None) -> str | None:
     """Return a human-readable OrcaSlicer path problem, or None when usable."""
-    from bambu_cli import bambu
 
     if path is None:
         return "OrcaSlicer path not specified in configuration."
-    expanded = bambu._expand_path(path)
-    display = bambu._display_path(expanded)
+    expanded = _expand_path(path)
+    display = _display_path(expanded)
     if not os.path.exists(expanded):
         return f"OrcaSlicer not found at {display}"
     if sys.platform != "win32" and not os.access(expanded, os.X_OK):
@@ -88,9 +87,8 @@ def _is_directory_input(path: str) -> bool:
 
 
 def _directory_input_message(path: str) -> str:
-    from bambu_cli import bambu
 
-    return f"Path is a directory, not a file: {bambu._path_for_message(path)}"
+    return f"Path is a directory, not a file: {_path_for_message(path)}"
 
 
 def _validate_slice_options(args: argparse.Namespace) -> str | None:
@@ -132,9 +130,8 @@ def _convert_step_to_stl(
     filepath: str,
 ) -> tuple[str | None, bool]:  # pragma: no cover -- gmsh external process; platform matrix
     """Convert STEP to STL using gmsh."""
-    from bambu_cli import bambu
 
-    filepath = os.path.abspath(bambu._expand_path(filepath))
+    filepath = os.path.abspath(_expand_path(filepath))
     stem = _safe_temp_prefix(os.path.splitext(os.path.basename(filepath))[0], fallback="converted")
 
     # Create a secure, owner-restricted temporary directory
@@ -188,7 +185,7 @@ def _convert_step_to_stl(
             pass
         return None, False
     except OSError as exc:
-        logger.error(f"STEP conversion failed: {bambu._exception_for_message(exc)}")
+        logger.error(f"STEP conversion failed: {_exception_for_message(exc)}")
         try:
             os.unlink(stl_path)
         except OSError:
@@ -201,7 +198,7 @@ def _convert_step_to_stl(
     try:
         size = os.path.getsize(stl_path) // 1024
     except OSError as exc:
-        logger.error(f"STEP conversion failed: {bambu._exception_for_message(exc)}")
+        logger.error(f"STEP conversion failed: {_exception_for_message(exc)}")
         try:
             os.unlink(stl_path)
         except OSError:
@@ -619,7 +616,6 @@ def _finalize_slice(
     step_converted: bool,
 ) -> str:
     """Evaluate the OrcaSlicer result, emit success/error output, and return the .3mf path."""
-    from bambu_cli import bambu
     from bambu_cli.cli import _namespace_get
     from bambu_cli.constants import EXIT_COMMAND_ERROR, EXIT_FILE_ERROR
     from bambu_cli.utils import emit_json, emit_json_error
@@ -645,7 +641,7 @@ def _finalize_slice(
         try:
             size = os.path.getsize(outpath)
         except OSError as exc:
-            message = f"Could not read sliced output file: {bambu._exception_for_message(exc)}"
+            message = f"Could not read sliced output file: {_exception_for_message(exc)}"
             logger.error(message)
             emit_json_error(
                 args,
@@ -658,8 +654,8 @@ def _finalize_slice(
             )
             abort("", exit_code=EXIT_FILE_ERROR)
         if size <= 0:
-            bambu._remove_partial_file(outpath)
-            message = f"Slicing produced an empty output file: {bambu._path_for_message(outpath)}"
+            _remove_partial_file(outpath)
+            message = f"Slicing produced an empty output file: {_path_for_message(outpath)}"
             logger.error(message)
             emit_json_error(
                 args,
@@ -674,8 +670,8 @@ def _finalize_slice(
             abort("", exit_code=EXIT_FILE_ERROR)
         # Zero returncode also requires a real 3MF — do not trust size alone.
         if not _is_valid_sliced_3mf(outpath):
-            bambu._remove_partial_file(outpath)
-            message = f"Slicing produced a corrupt or incomplete .3mf: {bambu._path_for_message(outpath)}"
+            _remove_partial_file(outpath)
+            message = f"Slicing produced a corrupt or incomplete .3mf: {_path_for_message(outpath)}"
             logger.error(message)
             emit_json_error(
                 args,
@@ -688,13 +684,13 @@ def _finalize_slice(
                 bytes=size,
             )
             abort("", exit_code=EXIT_FILE_ERROR)
-        logger.info(f"✅ Sliced: {bambu._path_for_message(outpath)} ({size // 1024}KB)")
+        logger.info(f"✅ Sliced: {_path_for_message(outpath)} ({size // 1024}KB)")
         if bool(_namespace_get(args, "json", False)):
             emit_json(
                 {
                     "status": "sliced",
                     "command": "slice",
-                    "file": bambu._expand_path(args.file),
+                    "file": _expand_path(args.file),
                     "path": outpath,
                     "filename": os.path.basename(outpath),
                     "bytes": size,
@@ -737,22 +733,21 @@ def cmd_slice(
     args: argparse.Namespace,
 ) -> str:
     """Slice an STL/STEP file into a printable .3mf using OrcaSlicer."""
-    from bambu_cli import bambu
     from bambu_cli.cli import _namespace_get
     from bambu_cli.constants import EXIT_COMMAND_ERROR, EXIT_CONFIG_ERROR, EXIT_FILE_ERROR, EXIT_TIMEOUT
     from bambu_cli.context import current_settings
     from bambu_cli.utils import emit_json_error
 
     settings = current_settings()
-    filepath = bambu._expand_path(args.file)
+    filepath = _expand_path(args.file)
     source_filepath = filepath
     if filepath.startswith("-"):
-        message = f"Invalid filepath: {bambu._path_for_message(filepath)}"
+        message = f"Invalid filepath: {_path_for_message(filepath)}"
         logger.error(message)
         emit_json_error(args, "slice", EXIT_FILE_ERROR, message, failed_step="validate", file=filepath)
         abort("", exit_code=EXIT_FILE_ERROR)
     if not os.path.exists(filepath):
-        message = f"File not found: {bambu._path_for_message(filepath)}"
+        message = f"File not found: {_path_for_message(filepath)}"
         logger.error(message)
         emit_json_error(args, "slice", EXIT_FILE_ERROR, message, failed_step="validate", file=filepath)
         abort("", exit_code=EXIT_FILE_ERROR)
@@ -777,8 +772,7 @@ def cmd_slice(
     try:
         # Auto-convert STEP → STL (OrcaSlicer CLI doesn't support STEP)
         if filepath.lower().endswith((".step", ".stp")):
-            convert_func = getattr(bambu, "_convert_step_to_stl", _convert_step_to_stl)
-            new_filepath, success = convert_func(filepath)
+            new_filepath, success = _convert_step_to_stl(filepath)
             if not success:
                 emit_json_error(
                     args,
@@ -792,7 +786,7 @@ def cmd_slice(
             filepath = new_filepath
             step_converted = True
 
-        model_info = bambu.MODEL_MAPPING.get(settings.printer_model, bambu.MODEL_MAPPING["P1P"])
+        model_info = MODEL_MAPPING.get(settings.printer_model, MODEL_MAPPING["P1P"])
         model_code = model_info["token"]
         full_model_name = model_info["full_name"]
 
@@ -809,22 +803,22 @@ def cmd_slice(
         layer = quality_map.get(args.quality, f"0.20mm Standard @BBL {model_code}")
         process_file = f"{layer}.json"
 
-        outdir = bambu._expand_path(args.output) if args.output else os.path.dirname(os.path.abspath(source_filepath))
+        outdir = _expand_path(args.output) if args.output else os.path.dirname(os.path.abspath(source_filepath))
         if outdir.startswith("-"):
-            message = f"Invalid output directory: {bambu._path_for_message(outdir)}"
+            message = f"Invalid output directory: {_path_for_message(outdir)}"
             logger.error(message)
             emit_json_error(
                 args, "slice", EXIT_COMMAND_ERROR, message, failed_step="validate", file=filepath, output=outdir
             )
             abort("", exit_code=EXIT_COMMAND_ERROR)
         try:
-            bambu._ensure_output_dir(outdir)
+            _ensure_output_dir(outdir)
         except BambuError as exc:
             emit_json_error(
                 args,
                 "slice",
                 (getattr(exc, "exit_code", None) or EXIT_FILE_ERROR),
-                f"Could not prepare output directory: {bambu._path_for_message(outdir)}",
+                f"Could not prepare output directory: {_path_for_message(outdir)}",
                 failed_step="validate",
                 file=filepath,
                 output=outdir,
@@ -883,8 +877,7 @@ def cmd_slice(
             detected_orca = detect_orca_slicer()
             if detected_orca and detected_orca != settings.orca_slicer:
                 logger.info(
-                    f"Detected OrcaSlicer at {bambu._display_path(detected_orca)} — "
-                    'set "orca_slicer" to this in config.json.'
+                    f'Detected OrcaSlicer at {_display_path(detected_orca)} — set "orca_slicer" to this in config.json.'
                 )
             else:
                 logger.info("Please update 'orca_slicer' in your config.json or place it in the tools/ directory.")
@@ -928,7 +921,7 @@ def cmd_slice(
 
         for path, name in [(machine, "machine"), (filament, "filament")]:
             if not os.path.exists(path):
-                message = f"Missing {name} profile: {bambu._path_for_message(path)}"
+                message = f"Missing {name} profile: {_path_for_message(path)}"
                 logger.error(message)
                 hint, detected_profiles = _profiles_dir_diagnostic(settings.profiles_dir)
                 if hint:
@@ -950,7 +943,7 @@ def cmd_slice(
         try:
             tmp_process, tmp_filament = _create_temp_profiles(process, filament, args)
         except Exception as exc:
-            message = f"Failed to prepare OrcaSlicer profiles: {bambu._exception_for_message(exc)}"
+            message = f"Failed to prepare OrcaSlicer profiles: {_exception_for_message(exc)}"
             logger.error(message)
             emit_json_error(
                 args,
@@ -997,7 +990,7 @@ def cmd_slice(
         logger.info(f"✂️  Slicing {os.path.basename(filepath)} ({settings_summary})...")
 
         # Dynamically get timeouts (A0530-NET-07)
-        slicer_timeout = bambu.get_slicer_timeout(args)
+        slicer_timeout = get_slicer_timeout(args)
 
         try:
             result = _run_orcaslicer(
@@ -1020,7 +1013,7 @@ def cmd_slice(
             )
             abort("", exit_code=EXIT_TIMEOUT)
         except OSError as exc:
-            message = f"Failed to run OrcaSlicer: {bambu._exception_for_message(exc)}"
+            message = f"Failed to run OrcaSlicer: {_exception_for_message(exc)}"
             logger.error(message)
             emit_json_error(
                 args,

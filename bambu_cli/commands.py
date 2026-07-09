@@ -3,6 +3,14 @@ import os
 import sys
 import tempfile
 
+from bambu_cli.cli import _exception_for_message, _exit_code_from_system_exit, _expand_path, _path_for_message
+from bambu_cli.config import (
+    CONFIG_PATH,
+    MODEL_MAPPING,
+    _expected_fingerprint,
+    get_upload_timeout,
+    load_config,
+)
 from bambu_cli.context import RuntimeContext
 from bambu_cli.download.naming import (
     _is_print_ready_name,
@@ -12,9 +20,10 @@ from bambu_cli.download.naming import (
     _safe_remote_name,
 )
 from bambu_cli.errors import BambuError, abort
+from bambu_cli.job import _last_error_for, _parse_print_options, _print_next_command, generate_print_payload
 from bambu_cli.logging_utils import logger
-
-# We dynamically import bambu at runtime in every function to support patching of functions and configuration globals
+from bambu_cli.slicer import _directory_input_message, _is_directory_input
+from bambu_cli.utils import _ensure_parent_dir, _redacted_serial
 
 
 def cmd_setup(args):
@@ -67,7 +76,6 @@ def _offer_pin_fingerprint(
 
 def cmd_doctor(args, ctx=None):
     """Health-check: auto-discover printer capabilities and verify configuration."""
-    from bambu_cli import bambu
     from bambu_cli.cli import _display_path, _exception_for_message, _namespace_get, _path_for_message
     from bambu_cli.constants import EXIT_CONFIG_ERROR, EXIT_FILE_ERROR, EXIT_NETWORK_ERROR
     from bambu_cli.protocols.ftps import get_ftp
@@ -93,14 +101,14 @@ def cmd_doctor(args, ctx=None):
         emit_json(payload)
 
     cap_path = _namespace_get(args, "output") or os.path.join(tempfile.gettempdir(), "printer_capabilities.json")
-    cap_path = bambu._expand_path(cap_path)
+    cap_path = _expand_path(cap_path)
     if cap_path.startswith("-"):
         message = f"Invalid output path: {_path_for_message(cap_path)}"
         logger.error(message)
         emit_doctor_failure("validate", EXIT_FILE_ERROR, message)
         abort("", exit_code=EXIT_FILE_ERROR)
     try:
-        bambu._ensure_parent_dir(cap_path)
+        _ensure_parent_dir(cap_path)
     except BambuError as exc:
         emit_doctor_failure(
             "validate",
@@ -111,9 +119,9 @@ def cmd_doctor(args, ctx=None):
 
     logger.info("🩺 Running Bambu printer health check...")
 
-    logger.info(f"   [1/3] Checking config at {_display_path(bambu.CONFIG_PATH)}...")
+    logger.info(f"   [1/3] Checking config at {_display_path(CONFIG_PATH)}...")
     try:
-        bambu.load_config()
+        load_config()
         logger.info("   ✅ Config loaded successfully.")
     except BambuError:
         logger.error("   ❌ Config check failed.")
@@ -126,7 +134,7 @@ def cmd_doctor(args, ctx=None):
         fp = None
 
     def log_pin_hint():
-        if fp and not bambu._expected_fingerprint() and not ctx.settings.insecure_tls:
+        if fp and not _expected_fingerprint() and not ctx.settings.insecure_tls:
             logger.info("      The printer uses a self-signed certificate. Pin it by adding to config.json:")
             logger.info(f'        "cert_fingerprint": "{fp}"')
             logger.info("      then re-run doctor.")
@@ -160,14 +168,14 @@ def cmd_doctor(args, ctx=None):
 
     if fp:
         logger.info(f"   🔐 Printer certificate SHA-256: {fp}")
-        if bambu._expected_fingerprint() == fp:
+        if _expected_fingerprint() == fp:
             logger.info("      ✅ Matches the pinned cert_fingerprint in your config.")
-        elif bambu._expected_fingerprint():
+        elif _expected_fingerprint():
             logger.warning("      ⚠️  Does NOT match the cert_fingerprint in your config!")
-        elif ctx.settings.insecure_tls or not _offer_pin_fingerprint(fp, bambu.CONFIG_PATH, json_mode):
+        elif ctx.settings.insecure_tls or not _offer_pin_fingerprint(fp, CONFIG_PATH, json_mode):
             logger.info('      Add "cert_fingerprint": "<above>" to config.json to pin this connection.')
 
-    model_info = bambu.MODEL_MAPPING.get(ctx.settings.printer_model, bambu.MODEL_MAPPING["P1P"])
+    model_info = MODEL_MAPPING.get(ctx.settings.printer_model, MODEL_MAPPING["P1P"])
     firmware = status.get("sw_ver")
     modules = printer.get_version(timeout=5)
     if modules:
@@ -177,7 +185,7 @@ def cmd_doctor(args, ctx=None):
     capabilities = {
         "model": status.get("hw_ver") or model_info["full_name"],
         "firmware": firmware or "Unknown",
-        "serial": bambu._redacted_serial(),
+        "serial": _redacted_serial(),
         "capabilities": {
             "ams": "ams" in status,
             "chamber_light": True,
@@ -342,26 +350,25 @@ def cmd_stop(args, ctx=None):
 
 def cmd_upload(args, ctx=None):
     """Upload a file to the printer via FTPS with binary retry/resume."""
-    from bambu_cli import bambu
     from bambu_cli.cli import _namespace_get
     from bambu_cli.constants import EXIT_FILE_ERROR, EXIT_NETWORK_ERROR
     from bambu_cli.printer import get_printer
     from bambu_cli.utils import emit_json, emit_json_error
 
     ctx = ctx or RuntimeContext.for_request(args)
-    filepath = bambu._expand_path(args.file)
+    filepath = _expand_path(args.file)
     if filepath.startswith("-"):
-        message = f"Invalid filepath: {bambu._path_for_message(filepath)}"
+        message = f"Invalid filepath: {_path_for_message(filepath)}"
         logger.error(message)
         emit_json_error(args, "upload", EXIT_FILE_ERROR, message, failed_step="validate", file=filepath)
         abort("", exit_code=EXIT_FILE_ERROR)
     if not os.path.exists(filepath):
-        message = f"File not found: {bambu._path_for_message(filepath)}"
+        message = f"File not found: {_path_for_message(filepath)}"
         logger.error(message)
         emit_json_error(args, "upload", EXIT_FILE_ERROR, message, failed_step="validate", file=filepath)
         abort("", exit_code=EXIT_FILE_ERROR)
-    if bambu._is_directory_input(filepath):
-        message = bambu._directory_input_message(filepath)
+    if _is_directory_input(filepath):
+        message = _directory_input_message(filepath)
         logger.error(message)
         emit_json_error(args, "upload", EXIT_FILE_ERROR, message, failed_step="validate", file=filepath)
         abort("", exit_code=EXIT_FILE_ERROR)
@@ -384,16 +391,14 @@ def cmd_upload(args, ctx=None):
     try:
         filesize = os.path.getsize(filepath)
     except OSError as exc:
-        message = (
-            f"Could not read file size for {bambu._path_for_message(filepath)}: {bambu._exception_for_message(exc)}"
-        )
+        message = f"Could not read file size for {_path_for_message(filepath)}: {_exception_for_message(exc)}"
         logger.error(message)
         emit_json_error(
             args, "upload", EXIT_FILE_ERROR, message, failed_step="validate", file=filepath, remote_name=filename
         )
         abort("", exit_code=EXIT_FILE_ERROR)
     if filesize <= 0:
-        message = f"Refusing to upload empty file: {bambu._path_for_message(filepath)}"
+        message = f"Refusing to upload empty file: {_path_for_message(filepath)}"
         logger.error(message)
         emit_json_error(
             args,
@@ -423,7 +428,7 @@ def cmd_upload(args, ctx=None):
             )
             abort("", exit_code=EXIT_NETWORK_ERROR)
 
-        logger.info(f"   ✅ Local file {bambu._path_for_message(filepath)} exists ({filesize // 1024}KB)")
+        logger.info(f"   ✅ Local file {_path_for_message(filepath)} exists ({filesize // 1024}KB)")
         if bool(_namespace_get(args, "json", False)):
             emit_json(
                 {
@@ -473,7 +478,7 @@ def cmd_upload(args, ctx=None):
         success = printer.upload_file(
             filepath,
             f"/model/{filename}",
-            timeout=getattr(bambu, "UPLOAD_TIMEOUT", 300),
+            timeout=get_upload_timeout(args),
             progress_callback=upload_callback,
             on_resume=on_resume,
         )
@@ -551,7 +556,6 @@ def cmd_files(args, ctx=None):
 
 def cmd_print(args, ctx=None):
     """Start printing a file already on the printer."""
-    from bambu_cli import bambu
     from bambu_cli.cli import _namespace_get
     from bambu_cli.constants import EXIT_COMMAND_ERROR, EXIT_FILE_ERROR
     from bambu_cli.utils import emit_json, emit_json_error
@@ -571,7 +575,7 @@ def cmd_print(args, ctx=None):
         emit_json_error(args, "print", EXIT_FILE_ERROR, message, failed_step="validate", file=basename)
         abort("", exit_code=EXIT_FILE_ERROR)
 
-    ams_mapping, print_option_error = bambu._parse_print_options(args)
+    ams_mapping, print_option_error = _parse_print_options(args)
     if print_option_error:
         logger.error(print_option_error)
         emit_json_error(args, "print", EXIT_COMMAND_ERROR, print_option_error, failed_step="validate", file=basename)
@@ -586,12 +590,12 @@ def cmd_print(args, ctx=None):
                     "command": "print",
                     "file": basename,
                     "printed": False,
-                    "next_command": bambu._print_next_command(args, basename),
+                    "next_command": _print_next_command(args, basename),
                 }
             )
         return
 
-    payload = bambu.generate_print_payload(
+    payload = generate_print_payload(
         basename,
         use_ams=getattr(args, "use_ams", False),
         ams_mapping=ams_mapping,
@@ -610,8 +614,8 @@ def cmd_print(args, ctx=None):
 
         execute_print_command(printer, payload, basename, dry_run=dry_run)
     except BambuError as exc:
-        exit_code = getattr(exc, "exit_code", None) or bambu._exit_code_from_system_exit(exc)
-        detail = bambu._last_error_for("print")
+        exit_code = getattr(exc, "exit_code", None) or _exit_code_from_system_exit(exc)
+        detail = _last_error_for("print")
         emit_json_error(
             args,
             "print",

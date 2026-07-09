@@ -210,3 +210,11 @@ def get_sequence_id():
     global _sequence_counter
     _sequence_counter += 1
     return str(_sequence_counter)
+
+
+def _redacted_serial():
+    """Return a non-identifying serial placeholder for reports written to disk."""
+    from bambu_cli.context import current_settings
+
+    serial = current_settings().serial
+    return "UNKNOWN" if not serial or serial == "UNKNOWN" else "<redacted>"

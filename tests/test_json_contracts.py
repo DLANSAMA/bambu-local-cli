@@ -8,7 +8,7 @@ gets caught here.
 
 Ground rules followed (docs/test-backlog.md):
 - Never touch a real printer/network: use `--sim` and a scratch config path.
-- Patch runtime state (`PRINTER_IP`, `CONFIG_PATH`, ...) on `bambu_cli.bambu`.
+- Patch runtime state on real modules (`bambu_cli.config.CONFIG_PATH`, etc.).
 - Drive the real argv/parser path via `bambu_cli.cli.main()`, catch
   `SystemExit`, capture stdout with `capsys`, and assert full payload shapes.
 """
@@ -117,9 +117,14 @@ def _reset_json_state():
 def run_main(monkeypatch, tmp_path, argv, config_path=None):
     """Drive bambu_cli.cli.main() with a scratch config path so no real
     on-disk config is ever touched, and return the SystemExit (or None)."""
+    import bambu_cli.cli as cli_mod
+    import bambu_cli.config as config_mod
+
     monkeypatch.setattr(sys, "argv", ["bambu-cli"] + list(argv))
-    monkeypatch.setattr(bambu, "CONFIG_PATH", config_path or str(tmp_path / "no-such-config" / "config.json"))
-    monkeypatch.setattr(bambu, "setup_logging", lambda *a, **k: None)
+    monkeypatch.setattr(
+        config_mod, "CONFIG_PATH", config_path or str(tmp_path / "no-such-config" / "config.json")
+    )
+    monkeypatch.setattr(cli_mod, "setup_logging", lambda *a, **k: None)
     exc = None
     try:
         main()
@@ -918,7 +923,7 @@ def test_version_json_shape(monkeypatch, tmp_path, capsys):
             },
         },
     )
-    assert payload["version"] == bambu.VERSION
+    assert payload["version"] == __import__("bambu_cli.constants", fromlist=["VERSION"]).VERSION
 
 
 # ---------------------------------------------------------------------------

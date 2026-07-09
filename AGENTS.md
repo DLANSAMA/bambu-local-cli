@@ -20,16 +20,19 @@ Agents interacting directly with the codebase should instantiate this class via 
 - Network operations (like MQTT request-response) support `timeout` and `retries` out of the box through `printer.send_command()` and `printer.status()`.
 
 ### Module layout
-Logic lives in focused modules; `bambu_cli/bambu.py` is the console entrypoint
-(dispatch + runtime state). Prefer injecting collaborators (`ctx.printer()`,
-factory params) over patching module globals.
+Logic lives in focused modules; `bambu_cli/bambu.py` is a **thin entrypoint**
+(console script + `main` re-export only — no `__getattr__` facade). Prefer
+injecting collaborators (`ctx.printer()`, keyword factory params with real
+defaults) over patching module globals. Tests must not patch `bambu_cli.bambu.*`
+for implementation symbols.
 - `cli.py` — argparse setup, `main()` dispatch, path/JSON message helpers
 - `commands.py` — printer subcommand handlers (status, upload, print, doctor, ...)
-- `download/` — package: URL/filename validation, HTML link scraping, ZIP extraction, the `download` command. Collaborators (`opener_factory`, `resolve_printables`, `noncolliding_path`) are injectable on `_cmd_download` / `cmd_download` — do not package-self-import for mock targets.
-- `job.py` — one-shot `job`/`send` orchestration, dry-run prediction, print payloads
+- `download/` — package: URL/filename validation, HTML link scraping, ZIP extraction, the `download` command. Collaborators (`opener_factory`, `resolve_printables`, `noncolliding_path`) are injectable on `_cmd_download` / `cmd_download`
+- `job.py` — one-shot `job`/`send` orchestration, dry-run prediction, print payloads (`JobSteps` injects step callables)
 - `setup_cmd/` — package: guided/non-interactive setup, mDNS discovery, config show/validate, preflight
-- `camera.py` — snapshot capture (direct port-6000 grab + Docker streamer fallback)
+- `camera.py` — snapshot capture (injectable grab_frame / docker runners)
 - `slicer.py` — OrcaSlicer integration; `config.py` — config load/apply, timeouts
+- `logging_utils.py` — process logger proxy; tests use `set_logger` / patch `_BACKEND`
 - `constants.py` — exit codes, file-type tables, safety limits (immutable)
 - `protocols/` — low-level FTPS and MQTT clients used by `BambuPrinter`
 
@@ -39,7 +42,7 @@ CLI help smoke auto-discover modules/commands (`scripts/syntax_smoke.py`,
 in `cli.py` is enough — no triplicated lists.
 
 New command logic goes in `commands.py` (or a new focused module) using
-`get_printer()` / `RuntimeContext`. Prefer real DI seams over facade re-exports.
+`get_printer()` / `RuntimeContext` and injectable collaborators.
 
 When adding tests, follow the conventions and prioritized gap list in
 `docs/test-backlog.md` (inject collaborators, JSON-contract assertions, no new

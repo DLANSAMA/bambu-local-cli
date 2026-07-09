@@ -3,11 +3,11 @@ from bambu_cli.errors import BambuError
 
 
 class TestBambuDoctor(unittest.TestCase):
-    @patch("bambu_cli.config.load_config")
+    @patch("bambu_cli.commands.load_config")
     @patch("sys.exit")
-    @patch("bambu_cli.bambu.logger")
+    @patch("bambu_cli.commands.logger")
     def test_cmd_doctor_config_load_fail(self, mock_logger, mock_exit, mock_load):
-        from bambu_cli.bambu import cmd_doctor
+        from bambu_cli.commands import cmd_doctor
         from bambu_cli.errors import ConfigError
 
         mock_load.side_effect = ConfigError("config missing")
@@ -18,12 +18,12 @@ class TestBambuDoctor(unittest.TestCase):
         self.assertEqual(cm.exception.exit_code, 1)
         mock_logger.error.assert_any_call("   ❌ Config check failed.")
 
-    @patch("bambu_cli.config.load_config")
+    @patch("bambu_cli.commands.load_config")
     @patch("bambu_cli.protocols.mqtt.get_status")
     @patch("sys.exit")
-    @patch("bambu_cli.bambu.logger")
+    @patch("bambu_cli.commands.logger")
     def test_cmd_doctor_mqtt_fail(self, mock_logger, mock_exit, mock_get_status, mock_load):
-        from bambu_cli.bambu import cmd_doctor
+        from bambu_cli.commands import cmd_doctor
         from bambu_cli.context import current_settings
 
         mock_load.return_value = {"printer_ip": "1.2.3.4"}
@@ -38,13 +38,13 @@ class TestBambuDoctor(unittest.TestCase):
             f"   ❌ MQTT connection failed. Ensure printer at {current_settings().printer_ip} is on and access code is correct."
         )
 
-    @patch("bambu_cli.config.load_config")
+    @patch("bambu_cli.commands.load_config")
     @patch("bambu_cli.protocols.mqtt.get_status")
     @patch("bambu_cli.protocols.ftps.get_ftp")
     @patch("sys.exit")
-    @patch("bambu_cli.bambu.logger")
+    @patch("bambu_cli.commands.logger")
     def test_cmd_doctor_ftps_fail(self, mock_logger, mock_exit, mock_get_ftp, mock_get_status, mock_load):
-        from bambu_cli.bambu import cmd_doctor
+        from bambu_cli.commands import cmd_doctor
 
         mock_load.return_value = {"printer_ip": "1.2.3.4"}
         mock_get_status.return_value = {"hw_ver": "P1P"}
@@ -60,10 +60,10 @@ class TestBambuDoctor(unittest.TestCase):
 
     @patch("bambu_cli.protocols.mqtt.get_status")
     @patch("bambu_cli.protocols.ftps.get_ftp")
-    @patch("bambu_cli.bambu.logger")
+    @patch("bambu_cli.commands.logger")
     @patch("builtins.open")
     def test_cmd_doctor_success(self, mock_file_open, mock_logger, mock_get_ftp, mock_get_status):
-        from bambu_cli.bambu import cmd_doctor
+        from bambu_cli.commands import cmd_doctor
         import tempfile
 
         args = MagicMock()
@@ -155,7 +155,7 @@ class TestBambuDryRun(unittest.TestCase):
     @patch("bambu_cli.printer.get_printer")
     @patch("bambu_cli.protocols.mqtt.get_status")
     def test_cmd_print_dry_run_success(self, mock_get_status, mock_get_printer):
-        from bambu_cli.bambu import cmd_print
+        from bambu_cli.commands import cmd_print
 
         args = MagicMock()
         args.file = "test.3mf"
@@ -208,7 +208,7 @@ class TestBambuSimulation(unittest.TestCase):
     @patch("bambu_cli.logging_utils.logger")
     @patch("bambu_cli.commands.logger")
     def test_simulation_mode_upload(self, mock_commands_logger, mock_ftps_logger):
-        from bambu_cli.bambu import cmd_upload
+        from bambu_cli.commands import cmd_upload
         import bambu_cli.bambu as bambu
 
         args = MagicMock()
@@ -250,9 +250,9 @@ class TestBambuSimulation(unittest.TestCase):
 
 
 class TestBambuSecurity(unittest.TestCase):
-    @patch("bambu_cli.bambu.logger")
+    @patch("bambu_cli.download.downloader.logger")
     def test_cmd_download_path_traversal_evasion(self, mock_logger):
-        from bambu_cli.bambu import cmd_download
+        from bambu_cli.commands import cmd_download
 
         args = MagicMock()
         args.url = "https://example.com/file.stl%00../../../../etc/passwd"
@@ -272,10 +272,10 @@ class TestBambuSecurity(unittest.TestCase):
 
         self.assertTrue(any("/tmp/passwd.stl" in call[0][0] for call in mock_logger.info.call_args_list))
 
-    @patch("bambu_cli.bambu.logger")
+    @patch("bambu_cli.slicer.logger")
     @patch("json.dump")
     def test_slice_parameter_injection_safety(self, mock_json_dump, mock_logger):
-        from bambu_cli.bambu import cmd_slice
+        from bambu_cli.slicer import cmd_slice
 
         args = MagicMock()
         args.file = "test.stl"

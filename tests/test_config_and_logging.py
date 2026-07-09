@@ -3,14 +3,14 @@ from bambu_cli.errors import BambuError
 
 
 class TestLoadConfig(unittest.TestCase):
-    @patch("bambu_cli.bambu.subprocess.run")
-    @patch("bambu_cli.bambu.logger")
+    @patch("bambu_cli.slicer.subprocess.run")
+    @patch("bambu_cli.logging_utils._BACKEND")
     @patch("os.path.exists")
     @patch("os.path.getsize")
     def test_cmd_slice_convert_step_to_stl_argument_injection(self, mock_getsize, mock_exists, mock_logger, mock_run):
         import os
 
-        from bambu_cli.bambu import _convert_step_to_stl
+        from bambu_cli.slicer import _convert_step_to_stl
 
         # Setup mocks
         mock_run.return_value.returncode = 0
@@ -40,7 +40,7 @@ class TestLoadConfig(unittest.TestCase):
         self.assertEqual(kwargs_run, {"capture_output": True, "text": True, "timeout": 60})
 
     @patch("os.path.exists")
-    @patch("bambu_cli.bambu.logger")
+    @patch("bambu_cli.logging_utils._BACKEND")
     def test_load_config_not_found(self, mock_logger, mock_exists):
         mock_exists.return_value = False
 
@@ -54,7 +54,7 @@ class TestLoadConfig(unittest.TestCase):
 
     @patch("os.stat")
     @patch("os.path.exists")
-    @patch("bambu_cli.bambu.logger")
+    @patch("bambu_cli.logging_utils._BACKEND")
     @patch("sys.exit")
     @patch("builtins.open", new_callable=mock_open, read_data="invalid json")
     def test_load_config_invalid_json(self, mock_file, mock_exit, mock_logger, mock_exists, mock_stat):
@@ -68,7 +68,7 @@ class TestLoadConfig(unittest.TestCase):
 
     @patch("os.path.exists")
     def test_load_config_not_found_no_exit(self, mock_exists):
-        from bambu_cli.bambu import load_config
+        from bambu_cli.config import load_config
 
         mock_exists.return_value = False
         result = load_config(exit_on_fail=False)
@@ -78,7 +78,7 @@ class TestLoadConfig(unittest.TestCase):
     @patch("os.path.exists")
     @patch("builtins.open", new_callable=mock_open, read_data="invalid json")
     def test_load_config_invalid_json_no_exit(self, mock_file, mock_exists, mock_stat):
-        from bambu_cli.bambu import load_config
+        from bambu_cli.config import load_config
 
         mock_exists.return_value = True
         result = load_config(exit_on_fail=False)
@@ -90,12 +90,12 @@ class TestLoadAccessCode(unittest.TestCase):
         import bambu_cli.bambu
 
         with config_ctx({"access_code": "inline_secret"}):
-            self.assertEqual(bambu_cli.bambu.load_access_code(), "inline_secret")
+            self.assertEqual(bambu_cli.config.load_access_code(), "inline_secret")
 
     @patch("os.path.expanduser")
     @patch("builtins.open", new_callable=mock_open, read_data=" file_secret ")
     def test_load_access_code_file(self, mock_file, mock_expanduser):
-        from bambu_cli.bambu import load_access_code
+        from bambu_cli.config import load_access_code
 
         if hasattr(load_access_code, "cache_clear"):
             load_access_code.cache_clear()
@@ -103,13 +103,13 @@ class TestLoadAccessCode(unittest.TestCase):
 
         with config_ctx({"access_code_file": "~/.config/bambu/secret"}):
             mock_expanduser.return_value = "/home/user/.config/bambu/secret"
-            self.assertEqual(bambu_cli.bambu.load_access_code(), "file_secret")
+            self.assertEqual(bambu_cli.config.load_access_code(), "file_secret")
 
-    @patch("bambu_cli.bambu.logger")
+    @patch("bambu_cli.logging_utils._BACKEND")
     @patch("os.path.expanduser")
     @patch("builtins.open", side_effect=FileNotFoundError)
     def test_load_access_code_file_not_found(self, mock_file, mock_expanduser, mock_logger):
-        from bambu_cli.bambu import load_access_code
+        from bambu_cli.config import load_access_code
 
         if hasattr(load_access_code, "cache_clear"):
             load_access_code.cache_clear()
@@ -117,15 +117,15 @@ class TestLoadAccessCode(unittest.TestCase):
 
         with config_ctx({"access_code_file": "~/.config/bambu/missing"}):
             with self.assertRaises(BambuError) as cm:
-                bambu_cli.bambu.load_access_code()
+                bambu_cli.config.load_access_code()
             self.assertEqual(cm.exception.exit_code, 1)
             self.assertTrue(
                 any("Access code file not found" in call[0][0] for call in mock_logger.error.call_args_list)
             )
 
-    @patch("bambu_cli.bambu.logger")
+    @patch("bambu_cli.logging_utils._BACKEND")
     def test_load_access_code_missing(self, mock_logger):
-        from bambu_cli.bambu import load_access_code
+        from bambu_cli.config import load_access_code
 
         if hasattr(load_access_code, "cache_clear"):
             load_access_code.cache_clear()
@@ -133,7 +133,7 @@ class TestLoadAccessCode(unittest.TestCase):
 
         with config_ctx({}):
             with self.assertRaises(BambuError) as cm:
-                bambu_cli.bambu.load_access_code()
+                bambu_cli.config.load_access_code()
             self.assertEqual(cm.exception.exit_code, 1)
             mock_logger.error.assert_called_with("No 'access_code' or 'access_code_file' in config.json")
 

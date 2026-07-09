@@ -17,7 +17,7 @@ class TestMain(unittest.TestCase):
         import bambu_cli.bambu
 
         mock_getaddrinfo.return_value = []
-        bambu_cli.bambu.main()
+        bambu_cli.cli.main()
         mock_cmd_status.assert_called_once()
         mock_setup_logging.assert_called_once_with(False)
 
@@ -28,7 +28,7 @@ class TestMain(unittest.TestCase):
         import bambu_cli.bambu
         from bambu_cli import context
 
-        bambu_cli.bambu.main()
+        bambu_cli.cli.main()
         self.assertTrue(context.get_current().simulation)
 
     @patch("sys.argv", ["bambu.py", "status"])
@@ -46,7 +46,7 @@ class TestMain(unittest.TestCase):
         context.set_current(RuntimeContext(settings=Settings(printer_ip="invalid_ip")))
         with patch("bambu_cli.config.load_config", return_value=None):
             with self.assertRaises((SystemExit, BambuError)) as cm:
-                bambu_cli.bambu.main()
+                bambu_cli.cli.main()
 
         self.assertEqual(getattr(cm.exception, "exit_code", getattr(cm.exception, "code", None)), 1)
         mock_logger.error.assert_called_with("Invalid printer_ip or hostname in config: invalid_ip")

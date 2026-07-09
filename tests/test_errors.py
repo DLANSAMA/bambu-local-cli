@@ -84,10 +84,12 @@ def test_abort_picks_file_error_class():
     assert ei.value.exit_code == EXIT_FILE_ERROR
 
 
-def test_exported_from_bambu_facade():
-    assert bambu.BambuError is BambuError
-    assert bambu.ConfigError is ConfigError
-    assert bambu.UploadError is UploadError
+def test_error_classes_are_public_from_errors_module():
+    from bambu_cli import errors as err
+
+    assert err.BambuError is BambuError
+    assert err.ConfigError is ConfigError
+    assert err.UploadError is UploadError
 
 
 def test_main_converts_bambu_error_to_json_payload(capsys):
@@ -105,7 +107,7 @@ def test_main_converts_bambu_error_to_json_payload(capsys):
         patch("bambu_cli.commands.cmd_status", side_effect=raise_it, create=True),
     ):
         with pytest.raises(SystemExit) as excinfo:
-            bambu.main()
+            __import__('bambu_cli.cli', fromlist=['main']).main()
 
     assert getattr(excinfo.value, "exit_code", getattr(excinfo.value, "code", None)) == EXIT_COMMAND_ERROR
     output = capsys.readouterr().out
@@ -128,6 +130,6 @@ def test_main_non_json_mode_exits_with_code():
         patch("bambu_cli.commands.cmd_status", side_effect=raise_it, create=True),
     ):
         with pytest.raises(SystemExit) as excinfo:
-            bambu.main()
+            __import__('bambu_cli.cli', fromlist=['main']).main()
 
     assert getattr(excinfo.value, "exit_code", getattr(excinfo.value, "code", None)) == EXIT_CONFIG_ERROR
