@@ -3,7 +3,7 @@ from bambu_cli.errors import BambuError
 
 
 class TestLoadConfig(unittest.TestCase):
-    @patch("bambu_cli.slicer.subprocess.run")
+    @patch("bambu_cli.slicer.step_convert.subprocess.run")
     @patch("bambu_cli.logging_utils._BACKEND")
     @patch("os.path.exists")
     @patch("os.path.getsize")

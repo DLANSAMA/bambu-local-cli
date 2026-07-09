@@ -107,7 +107,7 @@ def test_process_profile_compatible_mismatch(tmp_path):
 def test_convert_step_subprocess_fail(monkeypatch, tmp_path):
     step = tmp_path / "a.step"
     step.write_text("solid", encoding="utf-8")
-    monkeypatch.setattr(S.shutil, "which", lambda *a, **k: "/usr/bin/gmsh")
-    with patch.object(S.subprocess, "run", side_effect=FileNotFoundError("nope")):
+    monkeypatch.setattr(S.step_convert.shutil, "which", lambda *a, **k: "/usr/bin/gmsh")
+    with patch.object(S.step_convert.subprocess, "run", side_effect=FileNotFoundError("nope")):
         path, created = S._convert_step_to_stl(str(step))
     assert path is None or created is False or path is not None

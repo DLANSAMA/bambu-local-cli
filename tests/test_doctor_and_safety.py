@@ -272,7 +272,7 @@ class TestBambuSecurity(unittest.TestCase):
 
         self.assertTrue(any("/tmp/passwd.stl" in call[0][0] for call in mock_logger.info.call_args_list))
 
-    @patch("bambu_cli.slicer.logger")
+    @patch("bambu_cli.logging_utils._BACKEND")
     @patch("json.dump")
     def test_slice_parameter_injection_safety(self, mock_json_dump, mock_logger):
         from bambu_cli.slicer import cmd_slice
@@ -315,7 +315,7 @@ class TestBambuSecurity(unittest.TestCase):
             patch("subprocess.Popen", return_value=mock_proc),
             patch("os.unlink"),
             patch("os.path.getsize", return_value=1024),
-            patch("bambu_cli.slicer._is_valid_sliced_3mf", return_value=True),
+            patch("bambu_cli.slicer.output._is_valid_sliced_3mf", return_value=True),
         ):
             cmd_slice(args)
 

@@ -10,7 +10,7 @@ class TestBambuCmdSlice(unittest.TestCase):
     def tearDown(self):
         self.access_patcher.stop()
 
-    @patch("bambu_cli.slicer.logger")
+    @patch("bambu_cli.slicer.cmd.logger")
     def test_cmd_slice_invalid_filepath(self, mock_logger):
         from bambu_cli.slicer import cmd_slice
 
@@ -24,7 +24,7 @@ class TestBambuCmdSlice(unittest.TestCase):
         mock_logger.error.assert_called_with("Invalid filepath: -invalid")
 
     @patch("os.path.exists")
-    @patch("bambu_cli.slicer.logger")
+    @patch("bambu_cli.logging_utils._BACKEND")
     def test_cmd_slice_file_not_found(self, mock_logger, mock_exists):
         from bambu_cli.slicer import cmd_slice
 
@@ -40,7 +40,7 @@ class TestBambuCmdSlice(unittest.TestCase):
 
     @patch("os.path.exists")
     @patch("subprocess.run")
-    @patch("bambu_cli.slicer.logger")
+    @patch("bambu_cli.logging_utils._BACKEND")
     def test_cmd_slice_step_conversion_fail(self, mock_logger, mock_subprocess_run, mock_exists):
         from bambu_cli.slicer import cmd_slice
 
@@ -68,7 +68,7 @@ class TestBambuCmdSlice(unittest.TestCase):
 
     @patch("subprocess.Popen")
     @patch("os.path.exists")
-    @patch("bambu_cli.slicer.logger")
+    @patch("bambu_cli.logging_utils._BACKEND")
     # The baseline test context already pins profiles_dir=/tmp/mock_profiles and
     # orca_slicer=/tmp/mock_orca (conftest resets it per test), so the
     # exists_side_effect branches below are stable across platforms.
@@ -112,7 +112,7 @@ class TestBambuCmdSlice(unittest.TestCase):
             )
         )
 
-    @patch("bambu_cli.slicer._is_valid_sliced_3mf", return_value=True)
+    @patch("bambu_cli.slicer.output._is_valid_sliced_3mf", return_value=True)
     @patch("os.path.exists")
     @patch("os.path.isdir")
     @patch("os.listdir")
@@ -123,8 +123,8 @@ class TestBambuCmdSlice(unittest.TestCase):
     @patch("builtins.open", new_callable=unittest.mock.mock_open)
     @patch("json.load")
     @patch("json.dump")
-    @patch("bambu_cli.slicer.logger")
-    @patch("bambu_cli.slicer.platform.system", new=lambda: _HOST_SYSTEM)
+    @patch("bambu_cli.logging_utils._BACKEND")
+    @patch("bambu_cli.slicer.orca.platform.system", new=lambda: _HOST_SYSTEM)
     def test_cmd_slice_success(self, *mocks):
         mock_logger, mock_json_dump, mock_json_load, mock_open = mocks[:4]
         mock_tempfile, mock_subprocess_run, mock_unlink, mock_getsize = mocks[4:8]
@@ -166,7 +166,7 @@ class TestBambuCmdSlice(unittest.TestCase):
         # Check success message
         self.assertTrue(any("✅ Sliced: ./test_sliced.3mf" in call[0][0] for call in mock_logger.info.call_args_list))
 
-    @patch("bambu_cli.slicer._is_valid_sliced_3mf", return_value=True)
+    @patch("bambu_cli.slicer.output._is_valid_sliced_3mf", return_value=True)
     @patch("os.path.exists")
     @patch("os.path.isdir")
     @patch("os.listdir")
@@ -177,8 +177,8 @@ class TestBambuCmdSlice(unittest.TestCase):
     @patch("builtins.open", new_callable=unittest.mock.mock_open)
     @patch("json.load")
     @patch("json.dump")
-    @patch("bambu_cli.slicer.logger")
-    @patch("bambu_cli.slicer.platform.system", new=lambda: _HOST_SYSTEM)
+    @patch("bambu_cli.logging_utils._BACKEND")
+    @patch("bambu_cli.slicer.orca.platform.system", new=lambda: _HOST_SYSTEM)
     def test_cmd_slice_advanced_settings(self, *mocks):
         mock_logger, mock_json_dump, mock_json_load, mock_open = mocks[:4]
         mock_tempfile, mock_subprocess_run, mock_unlink, mock_getsize = mocks[4:8]
@@ -242,10 +242,10 @@ class TestBambuCmdSlice(unittest.TestCase):
 
 
 class TestConvertStepToStl(unittest.TestCase):
-    @patch("bambu_cli.slicer.subprocess.run")
+    @patch("bambu_cli.slicer.step_convert.subprocess.run")
     @patch("os.path.exists")
     @patch("os.path.getsize")
-    @patch("bambu_cli.slicer.logger")
+    @patch("bambu_cli.logging_utils._BACKEND")
     def test_convert_step_to_stl_success(self, mock_logger, mock_getsize, mock_exists, mock_run):
         from bambu_cli.slicer import _convert_step_to_stl
 
@@ -275,8 +275,8 @@ class TestConvertStepToStl(unittest.TestCase):
         self.assertEqual(cmd_run[out_idx], stl_path)
         mock_logger.info.assert_called_with(f"   Converted: {os.path.basename(stl_path)} (2KB)")
 
-    @patch("bambu_cli.slicer.subprocess.run")
-    @patch("bambu_cli.slicer.logger")
+    @patch("bambu_cli.slicer.step_convert.subprocess.run")
+    @patch("bambu_cli.slicer.step_convert.logger")
     def test_convert_step_to_stl_failure_return_code(self, mock_logger, mock_run):
         from bambu_cli.slicer import _convert_step_to_stl
 
@@ -290,9 +290,9 @@ class TestConvertStepToStl(unittest.TestCase):
         self.assertIsNone(stl_path)
         mock_logger.error.assert_called_with("STEP conversion failed.")
 
-    @patch("bambu_cli.slicer.subprocess.run")
+    @patch("bambu_cli.slicer.step_convert.subprocess.run")
     @patch("os.path.exists")
-    @patch("bambu_cli.slicer.logger")
+    @patch("bambu_cli.slicer.step_convert.logger")
     def test_convert_step_to_stl_failure_no_file(self, mock_logger, mock_exists, mock_run):
         from bambu_cli.slicer import _convert_step_to_stl
 
@@ -308,8 +308,8 @@ class TestConvertStepToStl(unittest.TestCase):
         self.assertIsNone(stl_path)
         mock_logger.error.assert_called_with("STEP conversion failed.")
 
-    @patch("bambu_cli.slicer.subprocess.run")
-    @patch("bambu_cli.slicer.logger")
+    @patch("bambu_cli.slicer.step_convert.subprocess.run")
+    @patch("bambu_cli.slicer.step_convert.logger")
     def test_convert_step_to_stl_filenotfounderror(self, mock_logger, mock_run):
         from bambu_cli.slicer import _convert_step_to_stl
 
@@ -330,9 +330,9 @@ class TestBambuCmdSliceEdgeCases(unittest.TestCase):
     def tearDown(self):
         self.access_patcher.stop()
 
-    @patch("bambu_cli.slicer._convert_step_to_stl")
+    @patch("bambu_cli.slicer.cmd._convert_step_to_stl")
     @patch("os.path.exists")
-    @patch("bambu_cli.slicer.logger")
+    @patch("bambu_cli.slicer.step_convert.logger")
     def test_cmd_slice_step_conversion_error(self, mock_logger, mock_exists, mock_convert):
         from bambu_cli.slicer import cmd_slice
 
@@ -348,8 +348,8 @@ class TestBambuCmdSliceEdgeCases(unittest.TestCase):
 
         mock_convert.assert_called_once_with("test.step")
 
-    @patch("bambu_cli.slicer.subprocess.run")
-    @patch("bambu_cli.slicer.logger")
+    @patch("bambu_cli.slicer.step_convert.subprocess.run")
+    @patch("bambu_cli.logging_utils._BACKEND")
     def test_cmd_slice_convert_step_to_stl_file_not_found(self, mock_logger, mock_run):
         from bambu_cli.slicer import _convert_step_to_stl
 
@@ -361,7 +361,7 @@ class TestBambuCmdSliceEdgeCases(unittest.TestCase):
         mock_logger.error.assert_called_with("STEP conversion failed. Please install gmsh for your platform.")
 
     @patch("os.path.exists")
-    @patch("bambu_cli.slicer.logger")
+    @patch("bambu_cli.logging_utils._BACKEND")
     def test_cmd_slice_invalid_output_dir(self, mock_logger, mock_exists):
         from bambu_cli.slicer import cmd_slice
 
@@ -378,15 +378,15 @@ class TestBambuCmdSliceEdgeCases(unittest.TestCase):
         mock_logger.error.assert_called_with("Invalid output directory: -invalid_dir")
 
     @patch("subprocess.Popen")
-    @patch("bambu_cli.slicer._create_temp_profiles")
+    @patch("bambu_cli.slicer.cmd._create_temp_profiles")
     @patch("os.unlink")
     @patch("os.path.getsize", return_value=1024)
     @patch("os.path.exists")
     # With os.path.exists mocked True, real makedirs('/tmp/out') skips parent
     # creation and fails on Windows (WinError 3) unless the dir already exists.
     @patch("os.makedirs", MagicMock())
-    @patch("bambu_cli.slicer.logger")
-    @patch("bambu_cli.slicer._is_valid_sliced_3mf", return_value=True)
+    @patch("bambu_cli.logging_utils._BACKEND")
+    @patch("bambu_cli.slicer.output._is_valid_sliced_3mf", return_value=True)
     def test_cmd_slice_copies_logic(
         self, mock_valid_3mf, mock_logger, mock_exists, mock_getsize, mock_unlink, mock_create, mock_run
     ):
@@ -433,7 +433,7 @@ class TestBambuCmdSliceEdgeCases(unittest.TestCase):
     @patch("os.path.isdir", return_value=True)
     @patch("os.path.exists")
     @patch("os.makedirs", MagicMock())
-    @patch("bambu_cli.slicer.logger")
+    @patch("bambu_cli.logging_utils._BACKEND")
     def test_cmd_slice_missing_profile_reports_detected_dir(
         self, mock_logger, mock_exists, mock_isdir, mock_listdir, mock_detect
     ):
@@ -468,7 +468,7 @@ class TestBambuCmdSliceEdgeCases(unittest.TestCase):
 
     @patch("os.path.exists")
     @patch("os.makedirs", MagicMock())
-    @patch("bambu_cli.slicer.logger")
+    @patch("bambu_cli.logging_utils._BACKEND")
     @patch("sys.exit")
     def test_cmd_slice_orca_slicer_not_found(self, mock_exit, mock_logger, mock_exists):
         from bambu_cli.slicer import cmd_slice
@@ -496,7 +496,7 @@ class TestBambuCmdSliceEdgeCases(unittest.TestCase):
     @patch("os.listdir")
     @patch("os.path.isdir")
     @patch("os.path.exists")
-    @patch("bambu_cli.slicer.logger")
+    @patch("bambu_cli.logging_utils._BACKEND")
     def test_cmd_slice_discover_process_profile_branches(self, mock_logger, mock_exists, mock_isdir, mock_listdir):
         from bambu_cli.slicer import _discover_process_profile
 
@@ -530,12 +530,12 @@ class TestBambuCmdSliceEdgeCases(unittest.TestCase):
             self.assertIsNone(result)
 
     @patch("subprocess.Popen")
-    @patch("bambu_cli.slicer._create_temp_profiles")
+    @patch("bambu_cli.slicer.cmd._create_temp_profiles")
     @patch("os.unlink")
     @patch("os.path.getsize", return_value=1024)
     @patch("os.path.exists")
     @patch("os.makedirs", MagicMock())
-    @patch("bambu_cli.slicer.logger")
+    @patch("bambu_cli.logging_utils._BACKEND")
     def test_cmd_slice_error_message_parsing(
         self, mock_logger, mock_exists, mock_getsize, mock_unlink, mock_create, mock_run
     ):

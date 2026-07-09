@@ -138,12 +138,14 @@ def test_a_benign_gl_noise_nonzero_is_success():
         # constructs under PROFILES_DIR don't exist on disk, and the produced
         # output .3mf (which we DID write) must read as present.
         with (
-            patch.object(slicer.subprocess, "Popen", FakePopen),
-            patch.object(slicer, "_slicer_executable_problem", return_value=None),
-            patch.object(slicer, "_create_temp_profiles", return_value=(tmp_proc, tmp_fil)),
-            patch.object(slicer, "_validate_slice_options", return_value=None),
-            patch.object(slicer.os.path, "exists", return_value=True),
-            patch.object(slicer.os.path, "getsize", return_value=real_size),
+            patch.object(slicer.orca.subprocess, "Popen", FakePopen),
+            patch.object(slicer.cmd, "_slicer_executable_problem", return_value=None),
+            patch.object(slicer.cmd, "_create_temp_profiles", return_value=(tmp_proc, tmp_fil)),
+            patch.object(slicer.cmd, "_validate_slice_options", return_value=None),
+            patch("bambu_cli.slicer.cmd.os.path.exists", return_value=True),
+            patch("bambu_cli.slicer.output.os.path.exists", return_value=True),
+            patch("bambu_cli.slicer.cmd.os.path.getsize", return_value=real_size),
+            patch("bambu_cli.slicer.output.os.path.getsize", return_value=real_size),
             settings_ctx(orca_slicer="/usr/bin/true", profiles_dir=tmpdir),
         ):
             result = slicer.cmd_slice(args)
@@ -171,12 +173,14 @@ def test_a_corrupt_3mf_rejected_despite_benign_gl_noise():
         FakePopen = _fake_popen_factory(1, stdout="", stderr=stderr)
 
         with (
-            patch.object(slicer.subprocess, "Popen", FakePopen),
-            patch.object(slicer, "_slicer_executable_problem", return_value=None),
-            patch.object(slicer, "_create_temp_profiles", return_value=(tmp_proc, tmp_fil)),
-            patch.object(slicer, "_validate_slice_options", return_value=None),
-            patch.object(slicer.os.path, "exists", return_value=True),
-            patch.object(slicer.os.path, "getsize", return_value=4100),
+            patch.object(slicer.orca.subprocess, "Popen", FakePopen),
+            patch.object(slicer.cmd, "_slicer_executable_problem", return_value=None),
+            patch.object(slicer.cmd, "_create_temp_profiles", return_value=(tmp_proc, tmp_fil)),
+            patch.object(slicer.cmd, "_validate_slice_options", return_value=None),
+            patch("bambu_cli.slicer.cmd.os.path.exists", return_value=True),
+            patch("bambu_cli.slicer.output.os.path.exists", return_value=True),
+            patch("bambu_cli.slicer.cmd.os.path.getsize", return_value=4100),
+            patch("bambu_cli.slicer.output.os.path.getsize", return_value=4100),
             settings_ctx(orca_slicer="/usr/bin/true", profiles_dir=tmpdir),
         ):
             with pytest.raises((SystemExit, BambuError)) as excinfo:
@@ -209,11 +213,12 @@ def test_a_real_error_still_fails():
             return path != outpath
 
         with (
-            patch.object(slicer.subprocess, "Popen", FakePopen),
-            patch.object(slicer, "_slicer_executable_problem", return_value=None),
-            patch.object(slicer, "_create_temp_profiles", return_value=(tmp_proc, tmp_fil)),
-            patch.object(slicer, "_validate_slice_options", return_value=None),
-            patch.object(slicer.os.path, "exists", side_effect=exists_side_effect),
+            patch.object(slicer.orca.subprocess, "Popen", FakePopen),
+            patch.object(slicer.cmd, "_slicer_executable_problem", return_value=None),
+            patch.object(slicer.cmd, "_create_temp_profiles", return_value=(tmp_proc, tmp_fil)),
+            patch.object(slicer.cmd, "_validate_slice_options", return_value=None),
+            patch("bambu_cli.slicer.cmd.os.path.exists", side_effect=exists_side_effect),
+            patch("bambu_cli.slicer.output.os.path.exists", side_effect=exists_side_effect),
             settings_ctx(orca_slicer="/usr/bin/true", profiles_dir=tmpdir),
         ):
             with pytest.raises((SystemExit, BambuError)) as excinfo:

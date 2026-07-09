@@ -46,8 +46,8 @@ def test_default_config_path_platforms(platform, monkeypatch, tmp_path):
 
 
 def test_convert_step_gmsh_missing(monkeypatch):
-    monkeypatch.setattr(slicer_mod.shutil, "which", lambda *_a, **_k: None)
-    with patch.object(slicer_mod.platform, "system", return_value="Linux"):
+    monkeypatch.setattr(slicer_mod.step_convert.shutil, "which", lambda *_a, **_k: None)
+    with patch.object(slicer_mod.step_convert.sys, "platform", "linux"):
         path, created = slicer_mod._convert_step_to_stl("/tmp/x.step")
     assert path is None
     assert created is False
