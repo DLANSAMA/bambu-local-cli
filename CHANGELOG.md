@@ -6,6 +6,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 ## [Unreleased]
 
 ### Fixed
+- Global `--json` placed *before* the subcommand is now honored by `status`, `light`, `pause`, and `resume` (they re-declared `--json` with an implicit `False` default that clobbered the global flag, so `bambu-cli --json status` silently emitted nothing).
 - `--allow-private-ips` now actually enables private/LAN downloads for that invocation (it was parsed but never applied to runtime settings).
 - `load_access_code` and domain handlers raise structured `BambuError` / `abort` instead of calling `sys.exit` (process exit is CLI entry only).
 
@@ -13,7 +14,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 - `VERSION` is resolved from package metadata / `pyproject.toml` only (no duplicate string in `constants.py`).
 - MQTT status-monitor teardown no longer uses a bare `except:`.
 - Removed `@mockable` / test-awareness indirection from production code.
-- CI coverage floor raised to **92%** (`--cov-fail-under=92`); single pytest path; blocking purity greps for `sys.exit` / `@mockable` / Mock branches.
+- CI coverage floor enforced at **79%** (`--cov-fail-under=79`); single pytest path; blocking purity greps for `sys.exit` / `@mockable` / Mock branches. (Raising the floor toward the 92% target is tracked as remaining Phase C work in `docs/quality-roadmap.md`.)
 
 ### Added
 - JSON schemas under `docs/schemas/` and contract tests in `tests/contracts/`.
