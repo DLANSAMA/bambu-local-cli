@@ -30,13 +30,16 @@ CONFIG_PATH = _default_config_path()
 
 
 def load_config(exit_on_fail=True):
-    """Load printer config from the platform-native config path."""
-    from bambu_cli import bambu
+    """Load printer config from the platform-native config path.
+
+    Uses the module-level ``CONFIG_PATH`` (tests may patch
+    ``bambu_cli.config.CONFIG_PATH``).
+    """
     from bambu_cli.cli import _display_path, _exception_for_message
     from bambu_cli.constants import EXIT_CONFIG_ERROR
     from bambu_cli.errors import abort
 
-    config_path = getattr(bambu, "CONFIG_PATH", CONFIG_PATH)
+    config_path = CONFIG_PATH
     if not os.path.exists(config_path):
         if not exit_on_fail:
             return None

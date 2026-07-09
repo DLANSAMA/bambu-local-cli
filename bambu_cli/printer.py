@@ -264,11 +264,16 @@ class BambuPrinter:
         return mqtt_protocol.get_version(self, timeout=timeout, retries=retries)
 
 
-def get_printer() -> BambuPrinter:
-    """Factory: build a BambuPrinter from the active run's settings."""
-    from bambu_cli import bambu
+def get_printer(*, access_code_loader=None) -> BambuPrinter:
+    """Factory: build a BambuPrinter from the active run's settings.
+
+    ``access_code_loader`` defaults to ``config.load_access_code``; tests may
+    inject a fake instead of patching module globals.
+    """
+    from bambu_cli.config import load_access_code
     from bambu_cli.context import _normalize_fingerprint, current_settings, current_simulation
 
+    _load = access_code_loader if access_code_loader is not None else load_access_code
     settings = current_settings()
     simulation_mode = current_simulation()
     return BambuPrinter(
@@ -276,7 +281,7 @@ def get_printer() -> BambuPrinter:
         serial=settings.serial,
         # Simulation mode never talks to a real printer, so it must not
         # require credentials (load_access_code exits when unconfigured).
-        access_code="" if simulation_mode else bambu.load_access_code(),
+        access_code="" if simulation_mode else _load(),
         insecure_tls=settings.insecure_tls,
         cert_fingerprint=_normalize_fingerprint(settings.cert_fingerprint),
         simulation_mode=simulation_mode,

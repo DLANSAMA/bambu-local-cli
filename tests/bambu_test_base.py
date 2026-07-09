@@ -46,8 +46,12 @@ with open(mock_config_path, "w", encoding="utf-8") as f:
     json.dump(_BASELINE_CONFIG, f)
 
 import bambu_cli.bambu as bambu
+import bambu_cli.config as _config_mod
 
-bambu.CONFIG_PATH = mock_config_path
+# Pin the isolated temp config path used by every test (production reads
+# bambu_cli.config.CONFIG_PATH directly; do not set bambu.CONFIG_PATH).
+_config_mod.CONFIG_PATH = mock_config_path
+bambu.CONFIG_PATH = mock_config_path  # legacy attr for any remaining readers
 
 from bambu_cli import context as _context
 from bambu_cli.context import RuntimeContext as _RuntimeContext

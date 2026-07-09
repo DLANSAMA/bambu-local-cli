@@ -15,10 +15,8 @@ from bambu_cli.utils import _secure_makedirs, emit_json_error
 
 
 def _config_path():
-    """Read the config path through the bambu module so tests can patch it."""
-    from bambu_cli import bambu
-
-    return getattr(bambu, "CONFIG_PATH", CONFIG_PATH)
+    """Return the active config path (patch ``CONFIG_PATH`` or this helper in tests)."""
+    return CONFIG_PATH
 
 
 def _normalize_model(model, default="P1P"):

@@ -78,7 +78,7 @@ def test_runtime_context_printer_simulation_mode():
 def test_runtime_context_printer_non_simulation_uses_load_access_code():
     settings = context.Settings(printer_ip="1.2.3.4", serial="SN1", cert_fingerprint="AA:BB")
     ctx = context.RuntimeContext(settings=settings, simulation=False)
-    with patch.object(bambu, "load_access_code", return_value="secretcode") as mock_load:
+    with patch("bambu_cli.config.load_access_code", return_value="secretcode") as mock_load:
         printer = ctx.printer()
     mock_load.assert_called_once()
     assert printer.access_code == "secretcode"
@@ -98,7 +98,7 @@ def test_get_current_lazy_builds_and_set_current_overrides():
 
 
 @patch("sys.argv", ["bambu.py", "--sim", "status"])
-@patch("bambu_cli.bambu.cmd_status")
+@patch("bambu_cli.commands.cmd_status")
 @patch("bambu_cli.cli.setup_logging")
 def test_main_populates_current_context(mock_setup_logging, mock_cmd_status):
     context.set_current(None)

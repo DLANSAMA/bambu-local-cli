@@ -19,9 +19,9 @@ from bambu_cli.logging_utils import logger
 
 def cmd_setup(args):
     """Interactive or non-interactive printer configuration setup."""
-    from bambu_cli import bambu
+    from bambu_cli.setup_cmd import _cmd_setup
 
-    bambu._cmd_setup(args)
+    _cmd_setup(args)
 
 
 from bambu_cli.utils import get_sequence_id
@@ -648,6 +648,19 @@ def cmd_download(args, **collaborators):
     return _cmd_download(args, **collaborators)
 
 
+def cmd_slice(args, **collaborators):
+    """Slice a model with OrcaSlicer.
+
+    Extra keyword args are forwarded to ``slicer.cmd_slice`` for injectable
+    collaborators when the slicer accepts them.
+    """
+    from bambu_cli.slicer import cmd_slice as _cmd_slice
+
+    if collaborators:
+        return _cmd_slice(args, **collaborators)
+    return _cmd_slice(args)
+
+
 def cmd_delete(args, ctx=None):
     """Delete a file from the printer via FTPS."""
     from bambu_cli.cli import _namespace_get
@@ -712,23 +725,23 @@ def cmd_snapshot(args, ctx=None, **collaborators):
 
 def cmd_preflight(args):
     """Check local install/config readiness without contacting printer."""
-    from bambu_cli import bambu
+    from bambu_cli.setup_cmd import _cmd_preflight
 
-    bambu._cmd_preflight(args)
+    _cmd_preflight(args)
 
 
 def cmd_config(args):
     """Show the effective config (redacted) or validate it locally."""
-    from bambu_cli import bambu
+    from bambu_cli.setup_cmd import _cmd_config
 
-    bambu._cmd_config(args)
+    _cmd_config(args)
 
 
 def cmd_job(args):
     """One-shot URL/local file workflow: download, slice, upload, optionally print."""
-    from bambu_cli import bambu
+    from bambu_cli.job import _cmd_job
 
-    return bambu._cmd_job(args)
+    return _cmd_job(args)
 
 
 def cmd_gcode(args, ctx=None):

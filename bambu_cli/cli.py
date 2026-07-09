@@ -479,16 +479,21 @@ def _setup_args_provided(args):
 
 
 def _resolve_command(name):
-    """Look up the cmd_* handler for a command through bambu_cli.bambu so
-    tests that patch bambu.cmd_* (or bambu.cmd_job) still take effect."""
-    func_name = "cmd_job" if name in ("job", "send") else f"cmd_{name}"
-    from bambu_cli import bambu
+    """Look up the cmd_* handler for a command on bambu_cli.commands.
 
-    return getattr(bambu, func_name, None)
+    Tests inject or patch ``bambu_cli.commands.cmd_*`` rather than the
+    former ``bambu_cli.bambu`` facade.
+    """
+    func_name = "cmd_job" if name in ("job", "send") else f"cmd_{name}"
+    from bambu_cli import commands as commands_mod
+
+    return getattr(commands_mod, func_name, None)
 
 
 def main():
-    from bambu_cli import bambu
+    from bambu_cli.config import load_config
+    from bambu_cli.constants import VERSION
+    from bambu_cli.setup_cmd import _cmd_setup_noninteractive
 
     utils._JSON_EMITTED = False
     utils._LAST_ERROR_PAYLOAD = None
@@ -500,11 +505,11 @@ def main():
                 {
                     "status": "ok",
                     "command": "version",
-                    "version": bambu.VERSION,
+                    "version": VERSION,
                 }
             )
         else:
-            print(f"bambu-cli {bambu.VERSION}")
+            print(f"bambu-cli {VERSION}")
         return
     if not args.cmd and bool(getattr(args, "json", False)):
         emit_json(
@@ -528,7 +533,7 @@ def main():
     if simulation:
         logger.info("🤖 Simulation mode enabled.")
 
-    bambu.load_config(exit_on_fail=False)
+    load_config(exit_on_fail=False)
 
     # load_config installs a RuntimeContext from the parsed config; layer the
     # request-scoped flags (simulation / json / SSRF override) onto it.
@@ -566,7 +571,7 @@ def main():
 
     if _json_setup_should_be_noninteractive(args):
         try:
-            bambu._cmd_setup_noninteractive(args)
+            _cmd_setup_noninteractive(args)
         except BambuError as exc:
             _handle_bambu_error(exc, "setup")
         return

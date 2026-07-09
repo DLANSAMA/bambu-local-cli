@@ -187,7 +187,7 @@ class TestResolvePrintablesUrl(unittest.TestCase):
 
     @patch("bambu_cli.bambu.logger")
     def test_get_printables_download_link_error(self, mock_logger):
-        from bambu_cli.bambu import _get_printables_download_link
+        from bambu_cli.printables import _get_printables_download_link
         import json
 
         mock_opener = MagicMock()

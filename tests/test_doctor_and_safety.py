@@ -3,7 +3,7 @@ from bambu_cli.errors import BambuError
 
 
 class TestBambuDoctor(unittest.TestCase):
-    @patch("bambu_cli.bambu.load_config")
+    @patch("bambu_cli.config.load_config")
     @patch("sys.exit")
     @patch("bambu_cli.bambu.logger")
     def test_cmd_doctor_config_load_fail(self, mock_logger, mock_exit, mock_load):
@@ -18,7 +18,7 @@ class TestBambuDoctor(unittest.TestCase):
         self.assertEqual(cm.exception.exit_code, 1)
         mock_logger.error.assert_any_call("   ❌ Config check failed.")
 
-    @patch("bambu_cli.bambu.load_config")
+    @patch("bambu_cli.config.load_config")
     @patch("bambu_cli.protocols.mqtt.get_status")
     @patch("sys.exit")
     @patch("bambu_cli.bambu.logger")
@@ -38,7 +38,7 @@ class TestBambuDoctor(unittest.TestCase):
             f"   ❌ MQTT connection failed. Ensure printer at {current_settings().printer_ip} is on and access code is correct."
         )
 
-    @patch("bambu_cli.bambu.load_config")
+    @patch("bambu_cli.config.load_config")
     @patch("bambu_cli.protocols.mqtt.get_status")
     @patch("bambu_cli.protocols.ftps.get_ftp")
     @patch("sys.exit")

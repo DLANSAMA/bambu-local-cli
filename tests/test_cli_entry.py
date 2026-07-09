@@ -10,7 +10,7 @@ class TestMain(unittest.TestCase):
         install_baseline_context()
 
     @patch("sys.argv", ["bambu.py", "status"])
-    @patch("bambu_cli.bambu.cmd_status")
+    @patch("bambu_cli.commands.cmd_status")
     @patch("bambu_cli.cli.setup_logging")
     @patch("socket.getaddrinfo")
     def test_main_argparse_subcommand(self, mock_getaddrinfo, mock_setup_logging, mock_cmd_status):
@@ -22,7 +22,7 @@ class TestMain(unittest.TestCase):
         mock_setup_logging.assert_called_once_with(False)
 
     @patch("sys.argv", ["bambu.py", "--sim", "status"])
-    @patch("bambu_cli.bambu.cmd_status")
+    @patch("bambu_cli.commands.cmd_status")
     @patch("bambu_cli.cli.setup_logging")
     def test_main_sim_flag(self, mock_setup_logging, mock_cmd_status):
         import bambu_cli.bambu
@@ -32,7 +32,7 @@ class TestMain(unittest.TestCase):
         self.assertTrue(context.get_current().simulation)
 
     @patch("sys.argv", ["bambu.py", "status"])
-    @patch("bambu_cli.bambu.logger")
+    @patch("bambu_cli.cli.logger")
     @patch("sys.exit")
     @patch("socket.getaddrinfo", side_effect=socket.gaierror)
     def test_main_invalid_printer_ip(self, mock_getaddrinfo, mock_exit, mock_logger):
@@ -44,7 +44,7 @@ class TestMain(unittest.TestCase):
         # Install a context with an unresolvable IP; mock load_config so main()
         # doesn't overwrite it from the on-disk config.
         context.set_current(RuntimeContext(settings=Settings(printer_ip="invalid_ip")))
-        with patch("bambu_cli.bambu.load_config", return_value=None):
+        with patch("bambu_cli.config.load_config", return_value=None):
             with self.assertRaises((SystemExit, BambuError)) as cm:
                 bambu_cli.bambu.main()
 
@@ -67,15 +67,15 @@ class TestBambuCmdSetup(unittest.TestCase):
     @patch("os.makedirs")
     @patch("os.open")
     @patch("builtins.open", new_callable=mock_open)
-    @patch("bambu_cli.bambu.time.sleep")
-    @patch("bambu_cli.bambu.logger")
-    @patch("bambu_cli.bambu.socket.inet_ntoa")
+    @patch("bambu_cli.setup_cmd.wizard.logger")
+    @patch("bambu_cli.setup_cmd.common.logger")
+    @patch("bambu_cli.setup_cmd.wizard.socket.inet_ntoa")
     def test_cmd_setup_zeroconf_success(
-        self, mock_ntoa, mock_logger, mock_sleep, mock_file, mock_open_fd, mock_makedirs, mock_getpass
+        self, mock_ntoa, mock_common_logger, mock_logger, mock_file, mock_open_fd, mock_makedirs, mock_getpass
     ):
         import sys
         import os
-        from bambu_cli.bambu import CONFIG_PATH
+        from bambu_cli.config import CONFIG_PATH
 
         mock_zc_module = MagicMock()
         mock_zc_class = MagicMock()
@@ -99,7 +99,7 @@ class TestBambuCmdSetup(unittest.TestCase):
 
         sys.modules["zeroconf"] = mock_zc_module
 
-        from bambu_cli.bambu import cmd_setup
+        from bambu_cli.commands import cmd_setup
 
         mock_getpass.return_value = "12345678"
         mock_open_fd.return_value = 5
@@ -109,7 +109,7 @@ class TestBambuCmdSetup(unittest.TestCase):
 
         from bambu_cli.utils import _display_path
 
-        mock_logger.info.assert_any_call(f"\n✅ Config saved to {_display_path(CONFIG_PATH)}")
+        mock_common_logger.info.assert_any_call(f"\n✅ Config saved to {_display_path(CONFIG_PATH)}")
         mock_file.assert_called_with(5, "w", encoding="utf-8")
         import json
 
@@ -121,10 +121,9 @@ class TestBambuCmdSetup(unittest.TestCase):
 
         del sys.modules["zeroconf"]
 
-    @patch("bambu_cli.bambu.time.sleep")
-    @patch("bambu_cli.bambu.logger")
+    @patch("bambu_cli.setup_cmd.wizard.logger")
     @patch("sys.exit")
-    def test_cmd_setup_zeroconf_no_devices(self, mock_exit, mock_logger, mock_sleep):
+    def test_cmd_setup_zeroconf_no_devices(self, mock_exit, mock_logger):
         import sys
 
         mock_zc_module = MagicMock()
@@ -137,7 +136,7 @@ class TestBambuCmdSetup(unittest.TestCase):
 
         sys.modules["zeroconf"] = mock_zc_module
 
-        from bambu_cli.bambu import cmd_setup
+        from bambu_cli.commands import cmd_setup
 
         mock_exit.side_effect = SystemExit(2)
 
@@ -147,7 +146,7 @@ class TestBambuCmdSetup(unittest.TestCase):
         mock_logger.error.assert_called_with("No printers found. Ensure printer is on the same network.")
         del sys.modules["zeroconf"]
 
-    @patch("bambu_cli.bambu.logger")
+    @patch("bambu_cli.setup_cmd.wizard.logger")
     @patch("sys.exit")
     def test_cmd_setup_zeroconf_not_installed(self, mock_exit, mock_logger):
         import sys
@@ -167,7 +166,7 @@ class TestBambuCmdSetup(unittest.TestCase):
         builtins.__import__ = mocked_import
 
         try:
-            from bambu_cli.bambu import cmd_setup
+            from bambu_cli.commands import cmd_setup
 
             mock_exit.side_effect = SystemExit(1)
 

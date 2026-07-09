@@ -492,16 +492,16 @@ def test_temp_workdir_cleanup_when_no_output_given(tmp_path, monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# Late-binding default JobSteps still delegate through the bambu facade.
+# Late-binding default JobSteps still resolve real command handlers.
 # ---------------------------------------------------------------------------
 
 
-def test_default_job_steps_delegate_through_bambu_facade(tmp_path, capsys, monkeypatch):
+def test_default_job_steps_delegate_through_commands(tmp_path, capsys, monkeypatch):
     ready = tmp_path / "model.3mf"
     ready.write_bytes(b"x" * 10)
     args = _parse(["job", str(ready), "--upload-only", "--json"])
 
-    monkeypatch.setattr(bambu, "cmd_upload", lambda ns: "model.3mf")
+    monkeypatch.setattr("bambu_cli.commands.cmd_upload", lambda ns: "model.3mf")
     _run_job(_ctx(), args, JobSteps())
     payload = _read_json(capsys)
     assert payload["status"] == "uploaded"
@@ -512,7 +512,7 @@ def test_cmd_job_shim_builds_context_and_default_steps(tmp_path, capsys, monkeyp
     ready = tmp_path / "model.3mf"
     ready.write_bytes(b"x" * 10)
     args = _parse(["job", str(ready), "--upload-only", "--json"])
-    monkeypatch.setattr(bambu, "cmd_upload", lambda ns: "model.3mf")
+    monkeypatch.setattr("bambu_cli.commands.cmd_upload", lambda ns: "model.3mf")
     job._cmd_job(args)
     payload = _read_json(capsys)
     assert payload["status"] == "uploaded"
@@ -779,11 +779,11 @@ def test_url_invalid_max_download_mb_fails(capsys):
 
 def test_run_job_defaults_steps_when_omitted(tmp_path, capsys, monkeypatch):
     # _run_job(ctx, args) with no steps arg builds default JobSteps() that
-    # late-bind through the bambu facade.
+    # late-bind to bambu_cli.commands handlers.
     ready = tmp_path / "model.3mf"
     ready.write_bytes(b"x" * 10)
     args = _parse(["job", str(ready), "--upload-only", "--json"])
-    monkeypatch.setattr(bambu, "cmd_upload", lambda ns: "model.3mf")
+    monkeypatch.setattr("bambu_cli.commands.cmd_upload", lambda ns: "model.3mf")
     _run_job(_ctx(), args)
     assert _read_json(capsys)["status"] == "uploaded"
 

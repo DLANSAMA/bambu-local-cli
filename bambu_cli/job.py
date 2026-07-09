@@ -68,27 +68,27 @@ from bambu_cli.utils import _ensure_output_dir, emit_json
 
 
 def _default_download():
-    from bambu_cli import bambu
+    from bambu_cli.commands import cmd_download
 
-    return bambu.cmd_download
+    return cmd_download
 
 
 def _default_slice():
-    from bambu_cli import bambu
+    from bambu_cli.commands import cmd_slice
 
-    return bambu.cmd_slice
+    return cmd_slice
 
 
 def _default_upload():
-    from bambu_cli import bambu
+    from bambu_cli.commands import cmd_upload
 
-    return bambu.cmd_upload
+    return cmd_upload
 
 
 def _default_print():
-    from bambu_cli import bambu
+    from bambu_cli.commands import cmd_print
 
-    return bambu.cmd_print
+    return cmd_print
 
 
 @dataclass
@@ -96,9 +96,9 @@ class JobSteps:
     """Injectable step callables for the job/send orchestrator.
 
     Each field defaults to a zero-arg factory that late-binds to the real
-    implementation through the ``bambu`` facade at call time, so existing
-    tests/callers that patch ``bambu.cmd_download`` (etc.) keep working even
-    when a caller doesn't supply its own ``JobSteps``.
+    command handlers on ``bambu_cli.commands`` at call time. Tests inject a
+    custom ``JobSteps`` (or patch ``bambu_cli.commands.cmd_*``) rather than
+    patching the former ``bambu_cli.bambu`` facade.
     """
 
     download: Optional[Callable] = None
