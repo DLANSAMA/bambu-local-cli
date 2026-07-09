@@ -20,9 +20,9 @@ Agents interacting directly with the codebase should instantiate this class via 
 - Network operations (like MQTT request-response) support `timeout` and `retries` out of the box through `printer.send_command()` and `printer.status()`.
 
 ### Module layout
-Logic lives in focused modules; `bambu_cli/bambu.py` is a thin entry point that
-holds config-derived runtime state (`SIMULATION_MODE`, `PRINTER_IP`, ...) and
-re-exports every helper as a stable compatibility facade for tests and scripts.
+Logic lives in focused modules; `bambu_cli/bambu.py` is the console entrypoint
+(dispatch + runtime state). Prefer injecting collaborators (`ctx.printer()`,
+factory params) over patching module globals.
 - `cli.py` — argparse setup, `main()` dispatch, path/JSON message helpers
 - `commands.py` — printer subcommand handlers (status, upload, print, doctor, ...)
 - `download/` — package: URL/filename validation, HTML link scraping, ZIP extraction, the `download` command
@@ -32,11 +32,17 @@ re-exports every helper as a stable compatibility facade for tests and scripts.
 - `slicer.py` — OrcaSlicer integration; `config.py` — config load/apply, timeouts
 - `constants.py` — exit codes, file-type tables, safety limits (immutable)
 - `protocols/` — low-level FTPS and MQTT clients used by `BambuPrinter`
+
+**Package inventory is derived:** setuptools finds `bambu_cli*`; syntax smoke and
+CLI help smoke auto-discover modules/commands (`scripts/syntax_smoke.py`,
+`scripts/cli_help_smoke.py`). Adding a module under `bambu_cli/` or a subcommand
+in `cli.py` is enough — no triplicated lists.
+
 New command logic goes in `commands.py` (or a new focused module) using
-`get_printer()`; add a re-export in `bambu.py` if tests or agents need to patch it.
+`get_printer()` / `RuntimeContext`. Prefer real DI seams over facade re-exports.
 
 When adding tests, follow the conventions and prioritized gap list in
-`docs/test-backlog.md` (patch targets, JSON-contract assertions, no new
+`docs/test-backlog.md` (inject collaborators, JSON-contract assertions, no new
 test-awareness branches in production code).
 
 ## Agent Usage
