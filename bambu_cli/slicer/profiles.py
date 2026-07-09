@@ -210,6 +210,18 @@ def _create_temp_profiles(process: str, filament: str, args: argparse.Namespace)
         if isinstance(speed, (int, float)):
             for key in ("outer_wall_speed", "inner_wall_speed", "sparse_infill_speed"):
                 proc_data[key] = str(speed)
+        first_layer_height = getattr(args, "first_layer_height", None)
+        if isinstance(first_layer_height, (int, float)):
+            proc_data["initial_layer_print_height"] = str(first_layer_height)
+        seam_position = getattr(args, "seam_position", None)
+        if seam_position:
+            proc_data["seam_position"] = seam_position
+        ironing = getattr(args, "ironing", None)
+        if ironing:
+            proc_data["ironing_type"] = "no ironing" if ironing == "none" else ironing
+        support_threshold = getattr(args, "support_threshold", None)
+        if isinstance(support_threshold, (int, float)):
+            proc_data["support_threshold_angle"] = str(support_threshold)
 
         # Generic process overrides (--set / --settings-json) win over the named
         # flags above; unknown keys warn but still pass through to OrcaSlicer.
@@ -240,6 +252,16 @@ def _create_temp_profiles(process: str, filament: str, args: argparse.Namespace)
         for plate in BED_PLATE_TYPES:
             fil_data[plate] = bed_temp_str_list
             fil_data[f"{plate}_initial_layer"] = bed_temp_str_list
+
+        # Named filament convenience flags (fan_max_speed is a per-extruder list).
+        fan_speed = getattr(args, "fan_speed", None)
+        if isinstance(fan_speed, (int, float)):
+            fil_data["fan_max_speed"] = [str(fan_speed)]
+        flow_ratio = getattr(args, "flow_ratio", None)
+        if isinstance(flow_ratio, (int, float)):
+            # Orca's filament profile key is `filament_flow_ratio` (the bare
+            # `flow_ratio` is a process-level setting and would be ignored here).
+            fil_data["filament_flow_ratio"] = str(flow_ratio)
 
         # Generic filament overrides (--set-filament / --settings-json). Temp
         # keys were already range-checked in _validate_slice_options, so a value

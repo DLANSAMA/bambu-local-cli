@@ -224,6 +224,9 @@ def _add_slice_override_args(parser):
     )
     parser.add_argument("--layer-height", dest="layer_height", type=float, metavar="MM", help="Layer height in mm.")
     parser.add_argument(
+        "--first-layer-height", dest="first_layer_height", type=float, metavar="MM", help="First-layer height in mm."
+    )
+    parser.add_argument(
         "--brim", dest="brim", type=float, metavar="MM", help="Brim width in mm (0 disables; >0 adds an outer brim)."
     )
     parser.add_argument(
@@ -232,6 +235,31 @@ def _add_slice_override_args(parser):
         type=float,
         metavar="MM/S",
         help="Main print speed (mm/s): sets outer/inner wall and sparse-infill speed.",
+    )
+    parser.add_argument(
+        "--seam-position",
+        dest="seam_position",
+        choices=["nearest", "aligned", "back", "random"],
+        help="Where to place layer seams.",
+    )
+    parser.add_argument(
+        "--ironing",
+        dest="ironing",
+        choices=["none", "top", "topmost", "solid"],
+        help="Ironing pass for smoother top surfaces (default none).",
+    )
+    parser.add_argument(
+        "--support-threshold",
+        dest="support_threshold",
+        type=float,
+        metavar="DEG",
+        help="Support overhang threshold angle in degrees.",
+    )
+    parser.add_argument(
+        "--fan-speed", dest="fan_speed", type=float, metavar="PCT", help="Maximum part-cooling fan speed (0-100%%)."
+    )
+    parser.add_argument(
+        "--flow-ratio", dest="flow_ratio", type=float, metavar="RATIO", help="Filament flow ratio (e.g. 0.98)."
     )
 
 

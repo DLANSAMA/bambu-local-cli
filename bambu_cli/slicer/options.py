@@ -252,6 +252,18 @@ def _validate_slice_options(args: argparse.Namespace) -> str | None:
     speed = _namespace_get(args, "speed", None)
     if isinstance(speed, (int, float)) and speed <= 0:
         return f"--speed must be a positive mm/s value (got {speed})"
+    first_layer_height = _namespace_get(args, "first_layer_height", None)
+    if isinstance(first_layer_height, (int, float)) and not (0 < first_layer_height <= 1.0):
+        return f"--first-layer-height must be between 0 and 1.0 mm (got {first_layer_height})"
+    support_threshold = _namespace_get(args, "support_threshold", None)
+    if isinstance(support_threshold, (int, float)) and not (0 <= support_threshold <= 90):
+        return f"--support-threshold must be between 0 and 90 degrees (got {support_threshold})"
+    fan_speed = _namespace_get(args, "fan_speed", None)
+    if isinstance(fan_speed, (int, float)) and not (0 <= fan_speed <= 100):
+        return f"--fan-speed must be between 0 and 100 (got {fan_speed})"
+    flow_ratio = _namespace_get(args, "flow_ratio", None)
+    if isinstance(flow_ratio, (int, float)) and not (0 < flow_ratio <= 2.0):
+        return f"--flow-ratio must be between 0 and 2.0 (got {flow_ratio})"
 
     # Generic overrides: fail fast on malformed KEY=VALUE / bad JSON.
     try:

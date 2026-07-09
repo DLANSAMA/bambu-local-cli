@@ -244,7 +244,7 @@ def test_create_temp_profiles_applies_set_override(tmp_path):
         nozzle_temp=220,
         bed_temp=60,
         set_process=["wall_loops=6"],
-        set_filament=["flow_ratio=0.98"],
+        set_filament=["filament_flow_ratio=0.98"],
         settings_json=None,
         brim=2,
     )
@@ -255,7 +255,7 @@ def test_create_temp_profiles_applies_set_override(tmp_path):
         assert proc["wall_loops"] == "6"  # --set won
         assert proc["brim_width"] == "2"  # named --brim flag
         assert proc["brim_type"] == "outer_only"
-        assert fil["flow_ratio"] == "0.98"  # --set-filament passthrough
+        assert fil["filament_flow_ratio"] == "0.98"  # --set-filament passthrough
     finally:
         import os as _os
 
@@ -347,3 +347,50 @@ def test_slice_args_for_job_threads_overrides():
     assert out.set_filament == ["flow_ratio=0.9"]
     assert out.settings_json == '{"process":{}}'
     assert out.layer_height == 0.15 and out.brim == 2.0 and out.speed == 100.0
+
+
+def test_create_temp_profiles_named_convenience_flags(tmp_path):
+    process = tmp_path / "process" / "p.json"
+    filament = tmp_path / "filament" / "f.json"
+    process.parent.mkdir()
+    filament.parent.mkdir()
+    process.write_text(json.dumps({"name": "p"}), encoding="utf-8")
+    filament.write_text(json.dumps({"fan_max_speed": ["80"], "name": "f"}), encoding="utf-8")
+    args = Namespace(
+        infill=15,
+        pattern="3dhoneycomb",
+        supports=False,
+        nozzle_temp=220,
+        bed_temp=60,
+        first_layer_height=0.25,
+        seam_position="back",
+        ironing="none",
+        support_threshold=40,
+        fan_speed=90,
+        flow_ratio=0.97,
+        set_process=None,
+        set_filament=None,
+        settings_json=None,
+    )
+    tmp_proc, tmp_fil = S._create_temp_profiles(str(process), str(filament), args)
+    try:
+        proc = json.loads(Path(tmp_proc.name).read_text(encoding="utf-8"))
+        fil = json.loads(Path(tmp_fil.name).read_text(encoding="utf-8"))
+        assert proc["initial_layer_print_height"] == "0.25"
+        assert proc["seam_position"] == "back"
+        assert proc["ironing_type"] == "no ironing"  # 'none' -> Orca's off value
+        assert proc["support_threshold_angle"] == "40"
+        assert fil["fan_max_speed"] == ["90"]  # list-typed, matches base shape
+        assert fil["filament_flow_ratio"] == "0.97"  # correct Orca key, not bare flow_ratio
+    finally:
+        import os as _os
+
+        _os.unlink(tmp_proc.name)
+        _os.unlink(tmp_fil.name)
+
+
+def test_validate_rejects_bad_convenience_flags():
+    assert "first-layer-height" in (S._validate_slice_options(_base_slice_args(first_layer_height=2.0)) or "")
+    assert "support-threshold" in (S._validate_slice_options(_base_slice_args(support_threshold=120)) or "")
+    assert "fan-speed" in (S._validate_slice_options(_base_slice_args(fan_speed=150)) or "")
+    assert "flow-ratio" in (S._validate_slice_options(_base_slice_args(flow_ratio=5.0)) or "")
