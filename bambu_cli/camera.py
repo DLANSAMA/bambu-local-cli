@@ -37,6 +37,10 @@ from bambu_cli.errors import BambuError, abort
 from bambu_cli.logging_utils import logger
 from bambu_cli.utils import _ensure_parent_dir, emit_json, emit_json_error
 
+# The port-6000 camera stream's first frames can be stale (buffered from a
+# previous connection); skip a few so the snapshot reflects the current scene.
+_SNAPSHOT_SKIP_FRAMES = 5
+
 
 def _grab_camera_frame_direct(
     printer,
@@ -44,6 +48,7 @@ def _grab_camera_frame_direct(
     *,
     create_connection=None,
     ssl_context_factory=None,
+    skip_frames=0,
 ):
     """Grab one JPEG frame from a P1/A1 printer camera using Bambu's native TLS
     port-6000 protocol (the same one Bambu Studio uses). Returns JPEG bytes, or
@@ -99,6 +104,8 @@ def _grab_camera_frame_direct(
             )
 
         tls.sendall(bytes(auth))
+        valid_frames_count = 0
+        last_frame = None
         for _ in range(30):
             hdr = _recv_exact(tls, 16)
             size = int.from_bytes(hdr[0:4], "little")
@@ -113,8 +120,11 @@ def _grab_camera_frame_direct(
                 break
             data = _recv_exact(tls, size)
             if data[:2] == b"\xff\xd8" and data[-2:] == b"\xff\xd9":
-                return bytes(data)
-        return None
+                last_frame = bytes(data)
+                valid_frames_count += 1
+                if valid_frames_count > skip_frames:
+                    return last_frame
+        return last_frame
     finally:
         try:
             sock.close()
@@ -169,7 +179,11 @@ def _cmd_snapshot(
     Collaborators are injectable so tests pass fakes instead of patching
     module globals. Defaults are the real production implementations.
     """
-    _grab = grab_frame if grab_frame is not None else _grab_camera_frame_direct
+    _grab = (
+        grab_frame
+        if grab_frame is not None
+        else (lambda printer: _grab_camera_frame_direct(printer, skip_frames=_SNAPSHOT_SKIP_FRAMES))
+    )
     _which = which if which is not None else shutil.which
     _run = subprocess_run if subprocess_run is not None else subprocess.run
     _load_code = access_code_loader if access_code_loader is not None else load_access_code
