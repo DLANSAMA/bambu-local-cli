@@ -57,6 +57,7 @@ printer_snapshot.jpg
 .ruff_cache/
 
 # Local model files
+downloads/
 *.stl
 *.3mf
 *.gcode

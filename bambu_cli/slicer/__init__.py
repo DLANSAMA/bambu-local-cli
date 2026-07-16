@@ -29,6 +29,7 @@ from bambu_cli.slicer.output import (  # noqa: F401
     _is_valid_sliced_3mf,
 )
 from bambu_cli.slicer.profiles import (  # noqa: F401
+    _create_temp_machine,
     _create_temp_profiles,
     _discover_process_profile,
     _process_profile_compatible,

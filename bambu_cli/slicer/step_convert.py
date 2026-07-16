@@ -28,6 +28,7 @@ def _convert_step_to_stl(
     stl_path = os.path.join(tmpdir, f"{stem}.stl")
 
     logger.info("🔄 Converting STEP → STL (OrcaSlicer CLI requires STL)...")
+    success = False
     try:
         cmd_args = ["gmsh", filepath, "-3", "-format", "stl", "-o", stl_path, "-clscale", GMSH_MESH_SCALE]
         if sys.platform != "win32" and shutil.which("nice"):
@@ -41,61 +42,25 @@ def _convert_step_to_stl(
                 if conv.stderr:
                     logger.error(f"Stderr:\n{conv.stderr}")
             logger.error("STEP conversion failed.")
-            try:
-                os.unlink(stl_path)
-            except OSError:
-                pass
-            try:
-                os.rmdir(tmpdir)
-            except OSError:
-                pass
             return None, False
 
+        size = os.path.getsize(stl_path) // 1024
     except FileNotFoundError:
         logger.error("STEP conversion failed. Please install gmsh for your platform.")
-        try:
-            os.unlink(stl_path)
-        except OSError:
-            pass
-        try:
-            os.rmdir(tmpdir)
-        except OSError:
-            pass
         return None, False
     except subprocess.TimeoutExpired:
         logger.error("STEP conversion timed out.")
-        try:
-            os.unlink(stl_path)
-        except OSError:
-            pass
-        try:
-            os.rmdir(tmpdir)
-        except OSError:
-            pass
         return None, False
     except OSError as exc:
         logger.error(f"STEP conversion failed: {_exception_for_message(exc)}")
-        try:
-            os.unlink(stl_path)
-        except OSError:
-            pass
-        try:
-            os.rmdir(tmpdir)
-        except OSError:
-            pass
         return None, False
-    try:
-        size = os.path.getsize(stl_path) // 1024
-    except OSError as exc:
-        logger.error(f"STEP conversion failed: {_exception_for_message(exc)}")
-        try:
-            os.unlink(stl_path)
-        except OSError:
-            pass
-        try:
-            os.rmdir(tmpdir)
-        except OSError:
-            pass
-        return None, False
-    logger.info(f"   Converted: {os.path.basename(stl_path)} ({size}KB)")
-    return stl_path, True
+    else:
+        success = True
+        logger.info(f"   Converted: {os.path.basename(stl_path)} ({size}KB)")
+        return stl_path, True
+    finally:
+        # On any failure path above, the tmpdir (and whatever gmsh left behind in it,
+        # partial STL included) is removed. On success, ownership of tmpdir transfers
+        # to the caller, which is responsible for cleaning it up once done.
+        if not success:
+            shutil.rmtree(tmpdir, ignore_errors=True)

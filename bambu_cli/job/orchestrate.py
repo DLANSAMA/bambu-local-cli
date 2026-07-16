@@ -151,8 +151,8 @@ def _run_job(ctx, args, steps=None):
             "Predicted printer filename is unsafe",
         )
 
-    is_temp_workdir = False
     workdir = None
+    temp_dirs = []  # every auto-created bambu-job-* dir; ALL are cleaned up in finally, no matter how workdir is reassigned
 
     try:
         if getattr(args, "dry_run", False) and _is_http_url(source):
@@ -188,7 +188,7 @@ def _run_job(ctx, args, steps=None):
             workdir = _prepare_job_output_dir(args, summary)
             if not workdir:
                 workdir = tempfile.mkdtemp(prefix="bambu-job-")
-                is_temp_workdir = True
+                temp_dirs.append(workdir)
             summary["workdir"] = workdir
             logger.info("🚦 Job source is a URL; downloading first.")
             summary["would_download"] = True
@@ -240,10 +240,11 @@ def _run_job(ctx, args, steps=None):
             if max_download_mb_error:
                 _job_fail(args, summary, "validate", EXIT_COMMAND_ERROR, max_download_mb_error)
         if ext in SLICEABLE_EXTENSIONS + ARCHIVE_DOWNLOAD_EXTENSIONS:
-            workdir = _prepare_job_output_dir(args, summary)
-            if not workdir and not getattr(args, "dry_run", False):
-                workdir = tempfile.mkdtemp(prefix="bambu-job-")
-                is_temp_workdir = True
+            if not workdir:
+                workdir = _prepare_job_output_dir(args, summary)
+                if not workdir and not getattr(args, "dry_run", False):
+                    workdir = tempfile.mkdtemp(prefix="bambu-job-")
+                    temp_dirs.append(workdir)
             if workdir:
                 summary["workdir"] = workdir
         if ext in ARCHIVE_DOWNLOAD_EXTENSIONS:
@@ -486,5 +487,7 @@ def _run_job(ctx, args, steps=None):
             emit_json(summary)
         return printable_path
     finally:
-        if is_temp_workdir and workdir and os.path.exists(workdir) and os.environ.get("BAMBU_KEEP_WORKDIR") != "1":
-            shutil.rmtree(workdir, ignore_errors=True)
+        if os.environ.get("BAMBU_KEEP_WORKDIR") != "1":
+            for temp_dir in temp_dirs:
+                if temp_dir and os.path.exists(temp_dir):
+                    shutil.rmtree(temp_dir, ignore_errors=True)

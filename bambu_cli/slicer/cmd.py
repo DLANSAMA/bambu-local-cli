@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import shutil
 import subprocess
 
 from bambu_cli.cli import _display_path, _exception_for_message, _expand_path, _namespace_get, _path_for_message
@@ -22,6 +23,7 @@ from bambu_cli.slicer.options import (
 from bambu_cli.slicer.orca import _build_orcaslicer_cmd, _run_orcaslicer
 from bambu_cli.slicer.output import _finalize_slice
 from bambu_cli.slicer.profiles import (
+    _create_temp_machine,
     _create_temp_profiles,
     _discover_process_profile,
     _profiles_dir_diagnostic,
@@ -111,6 +113,7 @@ def cmd_slice(
     step_converted = False
     tmp_process = None
     tmp_filament = None
+    tmp_machine = None
     result = None
 
     try:
@@ -287,6 +290,7 @@ def cmd_slice(
 
         try:
             tmp_process, tmp_filament = _create_temp_profiles(process, filament, args)
+            tmp_machine = _create_temp_machine(machine, settings.profiles_dir)
         except Exception as exc:
             message = f"Failed to prepare OrcaSlicer profiles: {_exception_for_message(exc)}"
             logger.error(message)
@@ -303,7 +307,7 @@ def cmd_slice(
         cmd = _build_orcaslicer_cmd(
             settings,
             args,
-            machine,
+            tmp_machine.name,
             tmp_process.name,
             tmp_filament.name,
             outfile,
@@ -372,20 +376,16 @@ def cmd_slice(
             )
             abort("", exit_code=EXIT_CONFIG_ERROR)
     finally:
-        for tmp_file in (tmp_process, tmp_filament):
+        for tmp_file in (tmp_process, tmp_filament, tmp_machine):
             if tmp_file is not None and hasattr(tmp_file, "name"):
                 try:
                     os.unlink(tmp_file.name)
                 except OSError:
                     pass
         if step_converted and filepath and os.path.exists(filepath):
-            try:
-                os.unlink(filepath)
-            except OSError:
-                pass
-            try:
-                os.rmdir(os.path.dirname(filepath))
-            except OSError:
-                pass
+            # filepath here is always the bambu_step_* tmpdir's converted STL (see
+            # _convert_step_to_stl); rmtree the whole tmpdir so leftover gmsh artifacts
+            # don't cause a leak the way a bare os.rmdir(empty-dir-only) would.
+            shutil.rmtree(os.path.dirname(filepath), ignore_errors=True)
 
     return _finalize_slice(result, outpath, args, filepath, step_converted)

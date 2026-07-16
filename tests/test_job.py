@@ -496,6 +496,34 @@ def test_temp_workdir_cleanup_when_no_output_given(tmp_path, monkeypatch):
 # ---------------------------------------------------------------------------
 
 
+def test_url_job_reuses_download_workdir_and_cleans_up(tmp_path, monkeypatch):
+    # Regression test: a URL-sourced job that slices used to allocate a
+    # *second* temp dir for slicing (leaking the first, which held the
+    # downloaded model). The download workdir must be reused for slicing and
+    # removed when the job finishes.
+    monkeypatch.delenv("BAMBU_KEEP_WORKDIR", raising=False)
+    captured = {}
+
+    def _download(download_args):
+        captured["download_workdir"] = download_args.output
+        model_path = os.path.join(download_args.output, "model.stl")
+        with open(model_path, "wb") as fh:
+            fh.write(b"solid x")
+        return model_path
+
+    def _slice(slice_args):
+        captured["slice_workdir"] = slice_args.output
+        return os.path.join(slice_args.output, "model.3mf")
+
+    args = _parse(["job", "https://example.com/model.stl", "--json"])
+    steps = JobSteps(download=_download, slice=_slice, upload=fake_upload("model.3mf"))
+    _run_job(_ctx(), args, steps)
+
+    assert captured["download_workdir"]
+    assert captured["slice_workdir"] == captured["download_workdir"]
+    assert not os.path.exists(captured["download_workdir"])
+
+
 def test_default_job_steps_delegate_through_commands(tmp_path, capsys, monkeypatch):
     ready = tmp_path / "model.3mf"
     ready.write_bytes(b"x" * 10)
