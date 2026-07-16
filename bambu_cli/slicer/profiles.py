@@ -286,3 +286,46 @@ def _create_temp_profiles(process: str, filament: str, args: argparse.Namespace)
         raise
 
     return tmp_process, tmp_filament
+
+
+def _create_temp_machine(machine_path: str, profiles_dir: str) -> IO[str]:
+    """Create a temp machine profile with its ``inherits`` chain flattened.
+
+    OrcaSlicer resolves ``inherits`` relative to its own preset locations, which
+    a temp file outside the profiles dir defeats — so parents are merged in here
+    (child keys win) and the ``inherits`` key dropped. A parent missing on disk
+    leaves the reference intact for Orca to resolve by name. Open/parse errors
+    propagate; the caller reports them as profile-preparation failures.
+    """
+
+    def _resolve_inherits(path: str) -> dict:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        inherits = data.get("inherits")
+        if inherits:
+            parent_path = os.path.join(profiles_dir, "machine", f"{inherits}.json")
+            if os.path.exists(parent_path):
+                merged = _resolve_inherits(parent_path)
+                del data["inherits"]
+                merged.update(data)
+                return merged
+        return data
+
+    resolved = _resolve_inherits(machine_path)
+    tmp_machine = tempfile.NamedTemporaryFile(  # noqa: SIM115 — handle outlives block; cleaned up by caller
+        mode="w", suffix=".json", delete=False, prefix="mach_", encoding="utf-8"
+    )
+    try:
+        json.dump(resolved, tmp_machine)
+        tmp_machine.close()
+    except Exception:
+        try:
+            tmp_machine.close()
+        except Exception:
+            pass
+        try:
+            os.unlink(tmp_machine.name)
+        except OSError:
+            pass
+        raise
+    return tmp_machine

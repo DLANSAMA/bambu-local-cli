@@ -62,7 +62,9 @@ def _build_orcaslicer_cmd(
             outdir,
         ]
     )
-    if copies > 1:
+    if copies > 1 or not filepath.lower().endswith(".3mf"):
+        # Loose meshes (STL/STEP/OBJ) may sit off-plate, so let Orca arrange
+        # them; a single-copy 3MF project keeps its embedded plate placement.
         cmd.extend(["--arrange", "1"])
     if getattr(args, "threads", None) is not None:
         cmd.extend(["--threads", str(args.threads)])

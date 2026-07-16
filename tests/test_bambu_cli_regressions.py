@@ -129,6 +129,7 @@ def test_a_benign_gl_noise_nonzero_is_success():
         profiles = _write_profiles(tmpdir)
         tmp_proc = types.SimpleNamespace(name=profiles["process.json"])
         tmp_fil = types.SimpleNamespace(name=profiles["filament.json"])
+        tmp_mach = types.SimpleNamespace(name=profiles["machine.json"])
         args = _slice_args(tmpdir, infile)
 
         stderr = "Failed to create GLFW window ... skip thumbnail"
@@ -141,6 +142,7 @@ def test_a_benign_gl_noise_nonzero_is_success():
             patch.object(slicer.orca.subprocess, "Popen", FakePopen),
             patch.object(slicer.cmd, "_slicer_executable_problem", return_value=None),
             patch.object(slicer.cmd, "_create_temp_profiles", return_value=(tmp_proc, tmp_fil)),
+            patch.object(slicer.cmd, "_create_temp_machine", return_value=tmp_mach),
             patch.object(slicer.cmd, "_validate_slice_options", return_value=None),
             patch("bambu_cli.slicer.cmd.os.path.exists", return_value=True),
             patch("bambu_cli.slicer.output.os.path.exists", return_value=True),
@@ -167,6 +169,7 @@ def test_a_corrupt_3mf_rejected_despite_benign_gl_noise():
         profiles = _write_profiles(tmpdir)
         tmp_proc = types.SimpleNamespace(name=profiles["process.json"])
         tmp_fil = types.SimpleNamespace(name=profiles["filament.json"])
+        tmp_mach = types.SimpleNamespace(name=profiles["machine.json"])
         args = _slice_args(tmpdir, infile)
 
         stderr = "Failed to create GLFW window ... skip thumbnail"
@@ -176,6 +179,7 @@ def test_a_corrupt_3mf_rejected_despite_benign_gl_noise():
             patch.object(slicer.orca.subprocess, "Popen", FakePopen),
             patch.object(slicer.cmd, "_slicer_executable_problem", return_value=None),
             patch.object(slicer.cmd, "_create_temp_profiles", return_value=(tmp_proc, tmp_fil)),
+            patch.object(slicer.cmd, "_create_temp_machine", return_value=tmp_mach),
             patch.object(slicer.cmd, "_validate_slice_options", return_value=None),
             patch("bambu_cli.slicer.cmd.os.path.exists", return_value=True),
             patch("bambu_cli.slicer.output.os.path.exists", return_value=True),
@@ -202,6 +206,7 @@ def test_a_real_error_still_fails():
         profiles = _write_profiles(tmpdir)
         tmp_proc = types.SimpleNamespace(name=profiles["process.json"])
         tmp_fil = types.SimpleNamespace(name=profiles["filament.json"])
+        tmp_mach = types.SimpleNamespace(name=profiles["machine.json"])
         args = _slice_args(tmpdir, infile)
 
         FakePopen = _fake_popen_factory(1, stdout="", stderr="[error] nothing to be sliced")
@@ -216,6 +221,7 @@ def test_a_real_error_still_fails():
             patch.object(slicer.orca.subprocess, "Popen", FakePopen),
             patch.object(slicer.cmd, "_slicer_executable_problem", return_value=None),
             patch.object(slicer.cmd, "_create_temp_profiles", return_value=(tmp_proc, tmp_fil)),
+            patch.object(slicer.cmd, "_create_temp_machine", return_value=tmp_mach),
             patch.object(slicer.cmd, "_validate_slice_options", return_value=None),
             patch("bambu_cli.slicer.cmd.os.path.exists", side_effect=exists_side_effect),
             patch("bambu_cli.slicer.output.os.path.exists", side_effect=exists_side_effect),

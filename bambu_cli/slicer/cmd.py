@@ -23,6 +23,7 @@ from bambu_cli.slicer.options import (
 from bambu_cli.slicer.orca import _build_orcaslicer_cmd, _run_orcaslicer
 from bambu_cli.slicer.output import _finalize_slice
 from bambu_cli.slicer.profiles import (
+    _create_temp_machine,
     _create_temp_profiles,
     _discover_process_profile,
     _profiles_dir_diagnostic,
@@ -112,6 +113,7 @@ def cmd_slice(
     step_converted = False
     tmp_process = None
     tmp_filament = None
+    tmp_machine = None
     result = None
 
     try:
@@ -288,6 +290,7 @@ def cmd_slice(
 
         try:
             tmp_process, tmp_filament = _create_temp_profiles(process, filament, args)
+            tmp_machine = _create_temp_machine(machine, settings.profiles_dir)
         except Exception as exc:
             message = f"Failed to prepare OrcaSlicer profiles: {_exception_for_message(exc)}"
             logger.error(message)
@@ -304,7 +307,7 @@ def cmd_slice(
         cmd = _build_orcaslicer_cmd(
             settings,
             args,
-            machine,
+            tmp_machine.name,
             tmp_process.name,
             tmp_filament.name,
             outfile,
@@ -373,7 +376,7 @@ def cmd_slice(
             )
             abort("", exit_code=EXIT_CONFIG_ERROR)
     finally:
-        for tmp_file in (tmp_process, tmp_filament):
+        for tmp_file in (tmp_process, tmp_filament, tmp_machine):
             if tmp_file is not None and hasattr(tmp_file, "name"):
                 try:
                     os.unlink(tmp_file.name)

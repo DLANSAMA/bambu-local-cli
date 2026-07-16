@@ -411,6 +411,7 @@ class TestBambuCmdSliceEdgeCases(unittest.TestCase):
         mock_logger.error.assert_called_with("Invalid output directory: -invalid_dir")
 
     @patch("subprocess.Popen")
+    @patch("bambu_cli.slicer.cmd._create_temp_machine")
     @patch("bambu_cli.slicer.cmd._create_temp_profiles")
     @patch("os.unlink")
     @patch("os.path.getsize", return_value=1024)
@@ -421,7 +422,15 @@ class TestBambuCmdSliceEdgeCases(unittest.TestCase):
     @patch("bambu_cli.logging_utils._BACKEND")
     @patch("bambu_cli.slicer.output._is_valid_sliced_3mf", return_value=True)
     def test_cmd_slice_copies_logic(
-        self, mock_valid_3mf, mock_logger, mock_exists, mock_getsize, mock_unlink, mock_create, mock_run
+        self,
+        mock_valid_3mf,
+        mock_logger,
+        mock_exists,
+        mock_getsize,
+        mock_unlink,
+        mock_create,
+        mock_create_machine,
+        mock_run,
     ):
         from bambu_cli.slicer import cmd_slice
 
@@ -432,6 +441,10 @@ class TestBambuCmdSliceEdgeCases(unittest.TestCase):
         mock_filament = MagicMock()
         mock_filament.name = "filament.json"
         mock_create.return_value = (mock_process, mock_filament)
+
+        mock_machine = MagicMock()
+        mock_machine.name = "machine.json"
+        mock_create_machine.return_value = mock_machine
 
         # Mock Popen
         mock_proc = _setup_slice_proc(MagicMock())
@@ -563,6 +576,7 @@ class TestBambuCmdSliceEdgeCases(unittest.TestCase):
             self.assertIsNone(result)
 
     @patch("subprocess.Popen")
+    @patch("bambu_cli.slicer.cmd._create_temp_machine")
     @patch("bambu_cli.slicer.cmd._create_temp_profiles")
     @patch("os.unlink")
     @patch("os.path.getsize", return_value=1024)
@@ -570,7 +584,7 @@ class TestBambuCmdSliceEdgeCases(unittest.TestCase):
     @patch("os.makedirs", MagicMock())
     @patch("bambu_cli.logging_utils._BACKEND")
     def test_cmd_slice_error_message_parsing(
-        self, mock_logger, mock_exists, mock_getsize, mock_unlink, mock_create, mock_run
+        self, mock_logger, mock_exists, mock_getsize, mock_unlink, mock_create, mock_create_machine, mock_run
     ):
         from bambu_cli.slicer import cmd_slice
 
@@ -586,6 +600,10 @@ class TestBambuCmdSliceEdgeCases(unittest.TestCase):
         mock_filament = MagicMock()
         mock_filament.name = "filament.json"
         mock_create.return_value = (mock_process, mock_filament)
+
+        mock_machine = MagicMock()
+        mock_machine.name = "machine.json"
+        mock_create_machine.return_value = mock_machine
 
         # Mock Popen
         mock_proc = _setup_slice_proc(
@@ -616,6 +634,110 @@ class TestBambuCmdSliceEdgeCases(unittest.TestCase):
 
         mock_logger.error.assert_any_call("   Missing wall settings")
         mock_logger.error.assert_any_call("   2024-01-01 nothing to be sliced")
+
+
+class TestBuildOrcaslicerCmd(unittest.TestCase):
+    """Unit tests for --arrange gating: loose meshes always arrange; a
+    single-copy 3MF project keeps its embedded plate placement."""
+
+    def _build(self, copies, filepath):
+        from bambu_cli.slicer.orca import _build_orcaslicer_cmd
+
+        settings = MagicMock()
+        settings.orca_slicer = "/tmp/orca"
+        args = MagicMock()
+        args.threads = None
+
+        with patch("platform.system", return_value="Windows"):
+            return _build_orcaslicer_cmd(
+                settings,
+                args,
+                "machine.json",
+                "process.json",
+                "filament.json",
+                "out.3mf",
+                "/tmp/out",
+                copies,
+                filepath,
+            )
+
+    def test_single_copy_stl_arranges(self):
+        cmd = self._build(1, "model.stl")
+        self.assertIn("--arrange", cmd)
+
+    def test_single_copy_3mf_does_not_arrange(self):
+        cmd = self._build(1, "project.3mf")
+        self.assertNotIn("--arrange", cmd)
+
+    def test_multi_copy_3mf_arranges(self):
+        cmd = self._build(2, "project.3mf")
+        self.assertIn("--arrange", cmd)
+
+
+class TestCreateTempMachine(unittest.TestCase):
+    """Unit tests for _create_temp_machine's inherits-chain flattening."""
+
+    def setUp(self):
+        self.tmpdir = tempfile.TemporaryDirectory()
+        self.machine_dir = os.path.join(self.tmpdir.name, "machine")
+        os.makedirs(self.machine_dir)
+        self._produced = []
+
+    def tearDown(self):
+        for path in self._produced:
+            try:
+                os.unlink(path)
+            except OSError:
+                pass
+        self.tmpdir.cleanup()
+
+    def _write(self, name, data):
+        path = os.path.join(self.machine_dir, f"{name}.json")
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+        return path
+
+    def test_inherits_chain_flattened_child_wins(self):
+        from bambu_cli.slicer.profiles import _create_temp_machine
+
+        self._write("grandparent", {"a": "g", "b": "g"})
+        self._write("parent", {"inherits": "grandparent", "b": "p", "c": "p"})
+        child_path = self._write("child", {"inherits": "parent", "c": "c", "d": "c"})
+
+        tmp_machine = _create_temp_machine(child_path, profiles_dir=self.tmpdir.name)
+        self._produced.append(tmp_machine.name)
+
+        with open(tmp_machine.name, encoding="utf-8") as f:
+            resolved = json.load(f)
+
+        self.assertEqual(resolved["a"], "g")
+        self.assertEqual(resolved["b"], "p")
+        self.assertEqual(resolved["c"], "c")
+        self.assertEqual(resolved["d"], "c")
+        self.assertNotIn("inherits", resolved)
+
+    def test_missing_parent_keeps_inherits_reference(self):
+        from bambu_cli.slicer.profiles import _create_temp_machine
+
+        child_path = self._write("child", {"inherits": "nonexistent", "d": "c"})
+
+        tmp_machine = _create_temp_machine(child_path, profiles_dir=self.tmpdir.name)
+        self._produced.append(tmp_machine.name)
+
+        with open(tmp_machine.name, encoding="utf-8") as f:
+            resolved = json.load(f)
+
+        self.assertEqual(resolved["inherits"], "nonexistent")
+
+    def test_corrupt_json_raises(self):
+        from bambu_cli.slicer.profiles import _create_temp_machine
+
+        child_path = os.path.join(self.machine_dir, "child.json")
+        with open(child_path, "w", encoding="utf-8") as f:
+            f.write("{not valid json")
+
+        with self.assertRaises((json.JSONDecodeError, ValueError)):
+            _create_temp_machine(child_path, profiles_dir=self.tmpdir.name)
 
 
 if __name__ == "__main__":
