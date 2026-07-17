@@ -42,6 +42,20 @@ from bambu_cli.utils import _ensure_parent_dir, emit_json, emit_json_error
 _SNAPSHOT_SKIP_FRAMES = 5
 
 
+class _CameraPinMismatch(BambuError):
+    """The camera TLS cert does not match the pinned ``cert_fingerprint``.
+
+    A pinned fingerprint is an explicit security control, so a mismatch must
+    hard-abort rather than fall back to the Docker streamer path (which would
+    connect to the printer without honoring the pin — a silent downgrade). This
+    is distinct from a missing pin or an ordinary connection failure, both of
+    which legitimately fall through to the streamer.
+    """
+
+    exit_code = EXIT_NETWORK_ERROR
+    failed_step = "grab"
+
+
 def _grab_camera_frame_direct(
     printer,
     timeout=12,
@@ -84,6 +98,7 @@ def _grab_camera_frame_direct(
         return buf
 
     sock = _connect((printer.ip, 6000), timeout=timeout)
+    tls = None
     try:
         tls = ctx.wrap_socket(sock, server_hostname=printer.ip)
         tls.settimeout(timeout)
@@ -95,7 +110,7 @@ def _grab_camera_frame_direct(
 
             actual = fingerprint_sha256(der)
             if actual.lower() != printer.cert_fingerprint.lower():
-                raise ssl.SSLError(
+                raise _CameraPinMismatch(
                     f"Certificate fingerprint mismatch: expected {printer.cert_fingerprint}, got {actual}"
                 )
         elif not printer.insecure_tls and not printer.cert_fingerprint:
@@ -126,8 +141,14 @@ def _grab_camera_frame_direct(
                     return last_frame
         return last_frame
     finally:
+        # wrap_socket() detaches the underlying fd into the SSLSocket, so on the
+        # success path closing `sock` is a no-op and the real fd would leak (a
+        # ResourceWarning under GC, an fd leak in a long-lived process). Close
+        # whichever object still owns the fd: `tls` once wrapped, else `sock`
+        # (wrap_socket raised before detaching).
+        closer = tls if tls is not None else sock
         try:
-            sock.close()
+            closer.close()
         except Exception:
             pass
 
@@ -216,6 +237,14 @@ def _cmd_snapshot(
     try:
         printer = ctx.printer()
         _frame = _grab(printer)
+    except _CameraPinMismatch as _exc:
+        # A pinned fingerprint that does not match is a security failure, not a
+        # "this printer needs Docker" signal: fail closed instead of silently
+        # falling back to the streamer (which would ignore the pin).
+        message = f"Camera TLS certificate does not match pinned fingerprint: {_exc}"
+        logger.error(message)
+        emit_json_error(args, "snapshot", EXIT_NETWORK_ERROR, message, failed_step="grab", output=outpath)
+        abort("", exit_code=EXIT_NETWORK_ERROR)
     except Exception as _exc:
         _frame = None
         logger.debug(f"Direct camera grab unavailable ({_exc}); trying Docker streamer.")

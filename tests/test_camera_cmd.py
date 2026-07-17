@@ -52,6 +52,9 @@ class TestGrabCameraFrameDirect(unittest.TestCase):
         mock_ctx.wrap_socket.assert_called_once_with(mock_sock, server_hostname="192.168.1.100")
         mock_tls.sendall.assert_called_once()
         mock_tls.getpeercert.assert_not_called()
+        # wrap_socket detaches the fd into the SSLSocket, so the wrapped object
+        # (not the bare socket) must be closed or the fd leaks.
+        mock_tls.close.assert_called_once()
 
     @patch("bambu_cli.config.fingerprint_sha256")
     def test_grab_camera_frame_direct_with_pin(self, mock_fp):
@@ -74,15 +77,17 @@ class TestGrabCameraFrameDirect(unittest.TestCase):
 
     @patch("bambu_cli.config.fingerprint_sha256")
     def test_grab_camera_frame_direct_pin_mismatch(self, mock_fp):
-        import ssl as ssl_mod
-        from bambu_cli.camera import _grab_camera_frame_direct
+        from bambu_cli.camera import _CameraPinMismatch, _grab_camera_frame_direct
 
         create_connection, ssl_factory, mock_sock, mock_tls, mock_ctx = self._mock_net()
         mock_tls.getpeercert.return_value = b"der_cert"
         mock_fp.return_value = "wrong_fingerprint"
         printer = _test_printer(ip="192.168.1.100", access_code="my_secret_code", cert_fingerprint="mock_fingerprint")
 
-        with self.assertRaises(ssl_mod.SSLError):
+        # A mismatching pin raises a dedicated security error (not a generic
+        # SSLError) so the snapshot command can fail closed instead of falling
+        # back to the Docker streamer, which would ignore the pin.
+        with self.assertRaises(_CameraPinMismatch):
             _grab_camera_frame_direct(
                 printer,
                 create_connection=create_connection,
@@ -219,6 +224,43 @@ class TestBambuCmdSnapshot(unittest.TestCase):
 
         self.assertEqual(getattr(cm.exception, "exit_code", getattr(cm.exception, "code", None)), 5)
         mock_logger.error.assert_called_with("Snapshot failed: Generic Error")
+
+    def test_cmd_snapshot_pin_mismatch_fails_closed(self):
+        """A pinned-cert mismatch during the direct grab must abort (exit 2)
+        without ever touching the Docker streamer fallback — otherwise the
+        streamer would connect to the printer ignoring the pin (silent
+        downgrade of an explicit security control)."""
+        from bambu_cli.camera import _CameraPinMismatch
+        from bambu_cli.commands import cmd_snapshot
+
+        mock_logger = MagicMock()
+        mock_run = MagicMock()
+        mock_urlopen = MagicMock()
+        args = MagicMock()
+        args.output = "snap.jpg"
+
+        def _grab(printer):
+            raise _CameraPinMismatch("Certificate fingerprint mismatch: expected aa, got bb")
+
+        with (
+            patch("bambu_cli.camera.logger", mock_logger),
+            self.assertRaises((SystemExit, BambuError)) as cm,
+        ):
+            cmd_snapshot(
+                args,
+                grab_frame=_grab,
+                which=lambda name: "/usr/bin/docker",
+                subprocess_run=mock_run,
+                urlopen=mock_urlopen,
+            )
+
+        self.assertEqual(getattr(cm.exception, "exit_code", getattr(cm.exception, "code", None)), 2)
+        # Never fell back to the streamer.
+        mock_run.assert_not_called()
+        mock_urlopen.assert_not_called()
+        self.assertTrue(
+            any("does not match pinned fingerprint" in c[0][0] for c in mock_logger.error.call_args_list)
+        )
 
     def test_cmd_snapshot_start_container(self):
         from bambu_cli.commands import cmd_snapshot

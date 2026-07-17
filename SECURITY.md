@@ -2,8 +2,8 @@
 
 `bambu-local-cli` controls 3D printers over your local network and downloads
 untrusted model files from the internet. Both are security-sensitive, so this
-document explains the threat model, the mitigations already in place, and how to
-report a vulnerability.
+document explains the threat model, the mitigations already in place, known
+limitations, and how to report a vulnerability.
 
 ## Reporting a vulnerability
 
@@ -47,40 +47,65 @@ and (b) explicit model downloads you request. Key properties:
 
 - **Printer TLS.** Bambu printers present a self-signed certificate over MQTTS
   and FTPS. Pin it with `cert_fingerprint` (SHA-256), which `bambu-cli setup`
-  can capture for you. Certificate verification is **fail-closed**: if a
-  fingerprint is pinned and does not match, the connection is refused.
-  `insecure_tls: true` disables verification entirely and exists only as a last
-  resort — it is never the default and the CLI warns when it is used.
+  / `doctor` can capture for you. When a fingerprint is set and does not match,
+  the connection is refused on MQTT, FTPS (control + data channel), and the
+  direct camera path. `insecure_tls: true` disables verification entirely and
+  exists only as a last resort — it is never the default and the CLI warns when
+  it is used.
+  - **Camera (port 6000):** fails closed if neither pin nor `insecure_tls` is set.
+  - **MQTT / FTPS without a pin:** use system CA verification (`CERT_REQUIRED`),
+    which fails for typical Bambu self-signed certs (effective fail-closed). Prefer
+    an explicit pin for clear errors and uniform policy.
 - **Access codes are secrets.** Store the printer access code in a separate file
   via `access_code_file` (the recommended path) rather than inline in
   `config.json`. Inline `access_code` still works for legacy configs but is
-  deprecated; migrate with `bambu setup --migrate-access-code`. `config show`
-  redacts the access code.
+  deprecated; migrate with `bambu-cli setup --migrate-access-code`. `config show`
+  redacts the access code. On POSIX, config and access-code files are tightened
+  toward `0600` on load.
 - **Downloads are SSRF-hardened.** URL fetches (including Printables) resolve
   and validate targets before connecting to block requests to private/loopback
-  address ranges, and enforce a size cap (2048 MB by default, `--max-download-mb`).
+  address ranges (unless `--allow-private-ips`, which is CLI-only and never
+  sticky config), disable environment proxies, cap redirect hops, and enforce a
+  size cap (2048 MB by default, `--max-download-mb`).
 - **Archive extraction is path-traversal safe.** ZIPs are extracted without
-  allowing entries to escape the destination directory; existing files are never
-  overwritten (a numbered sibling such as `model-1.stl` is created instead).
-- **Printing requires explicit intent.** One-shot flows will not start a physical
-  print without `--confirm`.
+  allowing entries to escape the destination directory; symlinks are skipped;
+  existing files are never overwritten (a numbered sibling such as `model-1.stl`
+  is created instead).
+- **Printing and other destructive actions require explicit intent.** Physical
+  print start, job print step, stop, delete, and raw gcode will not proceed
+  without `--confirm`. Agents must not invent confirm flags without user approval.
 
 ## Known limitations
 
-- The MQTT and FTPS printer protocols are **reverse-engineered**. A printer
-  firmware update can change them and break compatibility; treat protocol
-  behavior as best-effort, not guaranteed.
-- The access code grants full LAN control of the printer. Protect the config
-  directory with appropriate filesystem permissions, especially on shared or
-  agent-operated machines.
-- Sliced/downloaded model files come from untrusted sources. Review what you
-  print; the tool validates file handling, not model content.
+Documented residuals from the threat model and the 2026-07 security audit.
+Tracked for hardening; not all are “bugs” in the sense of broken claims.
+
+| Topic | Detail | Status |
+|-------|--------|--------|
+| **Camera Docker port bind** | Default `camera_port` is `1985:1984`, which Docker publishes on **all interfaces** (`0.0.0.0`). The CLI only requires the *client* streamer URL to be localhost. On multi-user or untrusted-LAN hosts, prefer `127.0.0.1:1985:1984` and set `camera_stream_url` explicitly if needed. Parsing of host-qualified port specs is incomplete today. | Open hardening |
+| **Camera pin fallback** | A pinned-fingerprint **mismatch** during the direct camera grab now hard-aborts the snapshot instead of silently falling back to the Docker streamer (which would ignore the pin). A *missing* pin (no `cert_fingerprint`, no `insecure_tls`) still falls through to the streamer, since there is no configured control to downgrade. | Fixed |
+| **HTTP downloads** | `http://` and `https://` are both accepted. SSRF controls apply; **content integrity** over cleartext HTTP does not (a network attacker can substitute a model). Prefer HTTPS sources. | Residual |
+| **pause / resume** | Do not require `--confirm` (unlike stop/print/delete/gcode). | Residual / product choice |
+| **Windows secret ACLs** | POSIX `0600` enforcement does not apply on Windows; protect the config directory with NTFS ACLs on shared machines. | Platform residual |
+| **Reverse-engineered protocols** | MQTT/FTPS behavior is best-effort; firmware updates can break compatibility. | Out of scope |
+| **Access code = full LAN control** | Protect the config directory, especially on agent-operated hosts. | Residual |
+| **Model content** | The tool validates packaging/paths/sizes, not whether a model is safe to print. | Residual |
+| **TOFU pin capture** | First-time fingerprint probe intentionally disables cert verification to *read* the pin. A MITM during setup can poison the pin if the LAN is already hostile. | Acknowledged |
+| **Agent auto-`--confirm`** | Process/policy issue; code cannot stop intentional confirmation. | Out of process scope |
+| **Third-party tools** | OrcaSlicer, gmsh, and the optional camera Docker image are outside this package’s SBOM boundary. | Out of scope |
 
 ## Scope
 
-In scope: the `bambu_cli` package and its published wheels/sdist, the CLI
+**In scope:** the `bambu_cli` package and its published wheels/sdist, the CLI
 surface, download/extraction handling, and the printer transport layer.
 
-Out of scope: vulnerabilities in third-party dependencies (report those
+**Out of scope:** vulnerabilities in third-party dependencies (report those
 upstream), OrcaSlicer itself, the printer firmware, and issues that require an
-already-compromised local machine or a malicious printer on your own LAN.
+already-compromised local machine or a malicious printer on your own LAN
+(beyond what pin/`insecure_tls` policy can mitigate).
+
+## Related docs
+
+- [AGENTS.md](AGENTS.md) — agent safety checklist  
+- [docs/quality-roadmap.md](docs/quality-roadmap.md) — security scoreboard  
+- [docs/api.md](docs/api.md) — agent JSON contracts  
