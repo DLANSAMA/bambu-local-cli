@@ -144,6 +144,7 @@ PRINTER_CONFIG_COMMANDS = {
 LOCAL_COMMANDS = {"slice", "download", "preflight", "setup", "config"}
 PRINTER_NETWORK_COMMANDS = PRINTER_CONFIG_COMMANDS - LOCAL_COMMANDS
 
+
 def __getattr__(name: str) -> str:
     if name == "VERSION":
         return _resolve_version()
