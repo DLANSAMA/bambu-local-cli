@@ -38,8 +38,6 @@ def _resolve_version() -> str:
     return _version_from_pyproject() or "0.0.0+dev"
 
 
-VERSION = _resolve_version()
-
 # Exit codes
 EXIT_SUCCESS = 0
 EXIT_CONFIG_ERROR = 1
@@ -145,3 +143,8 @@ PRINTER_CONFIG_COMMANDS = {
 }
 LOCAL_COMMANDS = {"slice", "download", "preflight", "setup", "config"}
 PRINTER_NETWORK_COMMANDS = PRINTER_CONFIG_COMMANDS - LOCAL_COMMANDS
+
+def __getattr__(name: str) -> str:
+    if name == "VERSION":
+        return _resolve_version()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
