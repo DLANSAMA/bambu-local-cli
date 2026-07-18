@@ -59,8 +59,20 @@ class _CameraPinMismatch(BambuError):
 
 
 # Container-port token of a docker ``-p`` spec: a port (or range) plus optional
-# protocol suffix, e.g. ``1984``, ``1984/tcp``, ``1984-1989/udp``.
+# protocol suffix, e.g. ``1984``, ``1984/tcp``, ``1984-1989/udp``. The digit
+# groups are only bounded to 1-5 characters here; the actual 1-65535 range
+# check happens in `_camera_port_is_valid` since a regex can't express it
+# cleanly (and \d{1,5} alone lets 99999 through).
 _CONTAINER_PORT_RE = re.compile(r"^\d{1,5}(-\d{1,5})?(/(tcp|udp|sctp))?$", re.IGNORECASE)
+
+
+def _is_valid_port_number(token):
+    """True if ``token`` is a decimal integer in the valid TCP/UDP port range
+    (1-65535)."""
+    try:
+        return 1 <= int(token) <= 65535
+    except ValueError:
+        return False
 
 
 def _camera_port_is_valid(camera_port):
@@ -68,11 +80,17 @@ def _camera_port_is_valid(camera_port):
     container port (the last colon field) is strictly checked; the optional host
     IP/port fields are left for docker to validate (and go list-form into argv,
     so there is no injection risk). Turns a confusing docker error into a clear
-    config error for the common typo cases (empty value, missing container port).
+    config error for the common typo cases (empty value, missing container port,
+    or a port number outside 1-65535).
     """
     if not camera_port:
         return False
-    return bool(_CONTAINER_PORT_RE.match(camera_port.split(":")[-1]))
+    container = camera_port.split(":")[-1]
+    match = _CONTAINER_PORT_RE.match(container)
+    if not match:
+        return False
+    port_spec = container.split("/", 1)[0]
+    return all(_is_valid_port_number(p) for p in port_spec.split("-"))
 
 
 def _camera_bind_host(camera_port):
