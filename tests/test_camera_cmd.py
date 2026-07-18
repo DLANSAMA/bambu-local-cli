@@ -277,9 +277,102 @@ class TestBambuCmdSnapshot(unittest.TestCase):
         # Never fell back to the streamer.
         mock_run.assert_not_called()
         mock_urlopen.assert_not_called()
+        self.assertTrue(any("does not match pinned fingerprint" in c[0][0] for c in mock_logger.error.call_args_list))
+
+    def test_cmd_snapshot_ssl_error_with_pin_configured_fails_closed(self):
+        """When a cert pin IS configured, an ssl.SSLError from the direct TLS
+        grab (e.g. a handshake failure caused by an active MITM interfering
+        with the port-6000 connection) must abort instead of silently falling
+        back to the unpinned Docker streamer -- otherwise an attacker could
+        defeat the pin simply by breaking the handshake rather than presenting
+        a mismatched certificate."""
+        import ssl as ssl_mod
+
+        from bambu_cli.commands import cmd_snapshot
+        from bambu_cli.context import RuntimeContext, Settings
+
+        mock_logger = MagicMock()
+        mock_run = MagicMock()
+        mock_urlopen = MagicMock()
+        args = MagicMock()
+        args.output = "snap.jpg"
+
+        def _grab(printer):
+            raise ssl_mod.SSLError("handshake failure")
+
+        ctx = RuntimeContext(settings=Settings(cert_fingerprint="aa" * 32, insecure_tls=False))
+
+        with (
+            patch("bambu_cli.camera.logger", mock_logger),
+            self.assertRaises((SystemExit, BambuError)) as cm,
+        ):
+            cmd_snapshot(
+                args,
+                ctx=ctx,
+                grab_frame=_grab,
+                which=lambda name: "/usr/bin/docker",
+                subprocess_run=mock_run,
+                urlopen=mock_urlopen,
+            )
+
+        self.assertEqual(getattr(cm.exception, "exit_code", getattr(cm.exception, "code", None)), 2)
+        # Never fell back to the streamer.
+        mock_run.assert_not_called()
+        mock_urlopen.assert_not_called()
         self.assertTrue(
-            any("does not match pinned fingerprint" in c[0][0] for c in mock_logger.error.call_args_list)
+            any("TLS error with a cert pin configured" in c[0][0] for c in mock_logger.error.call_args_list)
         )
+
+    def test_cmd_snapshot_ssl_error_without_pin_falls_back_to_docker(self):
+        """The same ssl.SSLError, but with no pin configured, must still fall
+        through to the Docker streamer -- this preserves the existing
+        no-pin-configured fallback behavior."""
+        import ssl as ssl_mod
+
+        from bambu_cli.commands import cmd_snapshot
+
+        mock_logger = MagicMock()
+        mock_subproc = MagicMock(
+            side_effect=[
+                MagicMock(returncode=1),  # inspect fails
+                MagicMock(returncode=0),  # rm
+                MagicMock(returncode=0),  # run
+            ]
+        )
+        mock_response = MagicMock()
+        mock_response.read.side_effect = [b"image data", b""]
+        mock_urlopen = MagicMock()
+        mock_urlopen.return_value.__enter__.return_value = mock_response
+        mock_sleep = MagicMock()
+        mock_load_access = MagicMock(return_value="MOCK_CODE")
+
+        def _grab(printer):
+            raise ssl_mod.SSLError("no pin configured")
+
+        args = MagicMock()
+        args.output = "snap.jpg"
+
+        with (
+            patch("bambu_cli.camera.logger", mock_logger),
+            settings_ctx(cert_fingerprint=None, insecure_tls=False),
+            patch("os.path.exists", return_value=True),
+            patch("os.fdopen", mock_open()),
+            patch("os.unlink"),
+            patch("os.path.getsize", return_value=2048),
+            patch("bambu_cli.camera._write_snapshot_atomic"),
+            patch("builtins.open", new_callable=mock_open),
+        ):
+            cmd_snapshot(
+                args,
+                grab_frame=_grab,
+                which=lambda name: "/usr/bin/docker",
+                subprocess_run=mock_subproc,
+                access_code_loader=mock_load_access,
+                urlopen=mock_urlopen,
+                sleep=mock_sleep,
+            )
+
+        mock_subproc.assert_called()
 
     def test_cmd_snapshot_start_container(self):
         from bambu_cli.commands import cmd_snapshot
@@ -425,9 +518,7 @@ class TestBambuCmdSnapshot(unittest.TestCase):
                 urlopen=mock_urlopen,
                 sleep=MagicMock(),
             )
-        self.assertTrue(
-            any("docker rm -f" in c[0][0] for c in mock_logger.warning.call_args_list)
-        )
+        self.assertTrue(any("docker rm -f" in c[0][0] for c in mock_logger.warning.call_args_list))
 
 
 if __name__ == "__main__":

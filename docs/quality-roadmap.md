@@ -36,13 +36,19 @@ Baselines from audit + full `pytest --cov=bambu_cli` on 2026-07-08:
 Updated **2026-07-17** (full codebase audit + doc truth pass). Foundational phases
 (0/A/B) are done. Phase C **typing is done** (full package + `check_untyped_defs`);
 coverage floor is **81** (target 92). Phase D schemas largely landed but not
-complete for every command. Open security hardenings (camera Docker bind default,
-camera pin soft-fallback) are documented in [SECURITY.md](../SECURITY.md) and do
-not lower the security *mindset* grade, but they block claiming security **A+**.
+complete for every command. The camera Docker bind default and camera pin
+soft-fallback hardenings are now **fixed** (loopback-only default bind,
+fail-closed on pin mismatch and on `ssl.SSLError` during the handshake when a
+pin is configured); see [SECURITY.md](../SECURITY.md) for the remaining
+residuals (the no-pin-configured Docker streamer path is unverified by design,
+and even with a pin a TCP-level failure on port 6000 still falls back to the
+streamer, since X1-series printers legitimately refuse that port).
+Those residuals do not lower the security *mindset* grade but are one reason
+security is not yet **A+**.
 
 | Area | Score | Evidence |
 |------|-------|----------|
-| Security mindset | **A** | allow-private-ips fixed; TLS pin suite; SSRF/redirect tests; bandit blocking; security markers; honest known-limitations table in SECURITY.md. A+ needs single pin helper + camera hardening closed |
+| Security mindset | **A** | allow-private-ips fixed; TLS pin suite (mismatch + handshake SSLError both fail closed); SSRF/redirect tests; bandit blocking; security markers; honest known-limitations table in SECURITY.md. A+ needs single pin helper |
 | Architecture | **A−** | `@mockable` = 0; abort error model; thin entrypoint; domain ↛ `sys.exit`. **Still open:** domain→`cli` private helper imports (~40 sites); Phase B.4 extract not done; pin verify not single-sourced (B.5) |
 | Agent JSON UX | **A** | ok/error envelopes + many per-command schemas + contract harness. Gaps: dedicated `status` success schema, upload/files/stop/setup |
 | Correctness / bugs | **A** | dead flags fixed (global `--json` before subcommand); structured errors; purity greps; version single-sourced |

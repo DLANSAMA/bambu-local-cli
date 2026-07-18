@@ -40,8 +40,8 @@ Tracked in [SECURITY.md](../SECURITY.md) known limitations:
 
 | Gap | Notes |
 |-----|-------|
-| Camera Docker bind default | Prefer `127.0.0.1:…` publish; fix `camera_port` → stream URL parsing; tests for bind parse |
-| Camera pin soft-fallback | Abort on `ssl.SSLError` / pin mismatch; no Docker fallthrough; regression test |
+| Camera Docker bind default | **Done.** Defaults to `127.0.0.1:…` publish; `camera_port` → stream URL parsing fixed; bind-parse tests in place |
+| Camera pin soft-fallback | **Done.** Aborts on pin mismatch and on `ssl.SSLError` from the handshake when a pin is configured; no Docker fallthrough in either case; regression tests in `tests/test_camera_cmd.py` |
 | Single TLS pin helper | One `verify_cert_fingerprint` used by mqtt/ftps/camera + unit suite |
 
 ### P1 — Coverage ratchet & transport residual

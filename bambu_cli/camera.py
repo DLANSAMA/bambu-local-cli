@@ -333,6 +333,22 @@ def _cmd_snapshot(
         logger.error(message)
         emit_json_error(args, "snapshot", EXIT_NETWORK_ERROR, message, failed_step="grab", output=outpath)
         abort("", exit_code=EXIT_NETWORK_ERROR)
+    except ssl.SSLError as _exc:
+        # A TLS handshake failure (e.g. from wrap_socket()) is a normal signal to
+        # fall back to Docker when no pin is configured -- but when a pin *is*
+        # configured, an attacker able to interfere with the port-6000 handshake
+        # could otherwise defeat the pin simply by breaking TLS instead of
+        # presenting a mismatched cert. Treat that case the same as a pin
+        # mismatch: fail closed, no Docker fallthrough. This deliberately covers
+        # post-handshake SSLErrors too (a truncation attack is indistinguishable
+        # from a flaky read, and the streamer would be unpinned).
+        if not printer.insecure_tls and printer.cert_fingerprint:
+            message = f"Camera TLS error with a cert pin configured (refusing to fall back to the unverified Docker streamer): {_exc}"
+            logger.error(message)
+            emit_json_error(args, "snapshot", EXIT_NETWORK_ERROR, message, failed_step="grab", output=outpath)
+            abort("", exit_code=EXIT_NETWORK_ERROR)
+        _frame = None
+        logger.debug(f"Direct camera grab unavailable ({_exc}); trying Docker streamer.")
     except Exception as _exc:
         _frame = None
         logger.debug(f"Direct camera grab unavailable ({_exc}); trying Docker streamer.")
