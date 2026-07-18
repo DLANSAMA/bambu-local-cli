@@ -31,6 +31,7 @@ classifiers = [
   "Programming Language :: Python :: 3.13",
   "Programming Language :: Python :: 3.14",
   "Topic :: System :: Hardware",
+  "Topic :: Printing",
  ]
 
 [project.optional-dependencies]

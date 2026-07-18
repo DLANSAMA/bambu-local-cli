@@ -257,7 +257,11 @@ def get_status(printer, timeout=None, retries=2):
             "hw_ver": "P1P-SIM",
             "sw_ver": "01.XX.XX.XX",
             "bed_temper": 25,
+            "bed_target_temper": 0,
             "nozzle_temper": 25,
+            "nozzle_target_temper": 0,
+            "cooling_fan_speed": 0,
+            "wifi_signal": "-42dBm",
             # A representative AMS so agents can exercise `status --json` AMS
             # parsing (and --ams-mapping decisions) without hardware.
             "ams": {

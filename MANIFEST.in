@@ -16,6 +16,7 @@ include SECURITY.md
 include CHANGELOG.md
 include MANIFEST.in
 include pyproject.toml
+include pytest.ini
 
 # Agent JSON contracts (machine + human). Not the quality/planning docs.
 include docs/api.md

@@ -2,7 +2,7 @@
 
 Runs on Linux, macOS, and Windows.
 
-**Script:** `python3 <path>/scripts/bambu.py` (legacy path; installed command is `bambu-cli`)
+**Command:** `bambu-cli` (installed via pip/uv). Legacy path without installing: `python3 <path>/scripts/bambu.py`.
 
 Prefer `job`/`send` for agent work. Always ask the user before running any command with `--confirm`.
 
@@ -70,7 +70,7 @@ Published on PyPI as `bambu-local-cli`; the installed command is `bambu-cli`.
 | **Wheel** | Runtime `bambu_cli` package only — no docs, scripts, or tests |
 | **Sdist** | Runtime + tests/scripts + **ship docs**: `README.md`, `AGENTS.md`, `SECURITY.md`, `CHANGELOG.md`, `docs/api.md`, `docs/schemas/*` |
 
-**Repo-only (never in sdist/wheel):** `CONTRIBUTING.md`, `docs/quality-roadmap.md`, `docs/test-backlog.md`, `docs/mutation-baseline.md`, `docs/live-printer-smoke.md`, and local `CLAUDE.md`. Enforced by `MANIFEST.in` + `tests/package_contents_smoke.py`.
+**Repo-only (never in sdist/wheel):** `CONTRIBUTING.md`, `docs/quality-roadmap.md`, `docs/test-backlog.md`, `docs/mutation-baseline.md`, `docs/live-printer-smoke.md`, and local agent notes (not in repo). Enforced by `MANIFEST.in` + `tests/package_contents_smoke.py`.
 
 ## Quality gates (agents)
 
