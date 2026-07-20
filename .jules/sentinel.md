@@ -1,0 +1,4 @@
+## 2024-03-24 - [Replace Weak Randomness with Cryptographic Secrets]
+**Vulnerability:** [Weak random number generation used in backoff delay]
+**Learning:** [Using `random` module for generating backoff delay jitter is flagged as a generic security anti-pattern (CWE-322/B311: "Weak random number generation"). While not strictly used for cryptographic secrets here, the presence of `random` import is poor hygiene and replacing it with `secrets.SystemRandom().uniform()` ensures cryptographically strong randomness.]
+**Prevention:** [Always use `secrets` instead of `random` to generate random values, especially when working on security-related tasks.]
