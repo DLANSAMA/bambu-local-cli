@@ -32,7 +32,8 @@ def setup_logging(verbose=False, json_mode=False):
 
         install(show_locals=False)
         console = Console(stderr=True)
-        handler = RichHandler(console=console, rich_tracebacks=True, markup=True)
+        # file.py:line origin column is developer detail — only show it with --verbose.
+        handler = RichHandler(console=console, rich_tracebacks=True, markup=True, show_path=verbose)
     except ImportError:
         stream = sys_module.stderr
         handler = logging_module.StreamHandler(stream)
