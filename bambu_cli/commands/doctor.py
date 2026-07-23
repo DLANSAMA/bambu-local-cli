@@ -81,7 +81,10 @@ def cmd_doctor(args, ctx=None):
             payload.update(extra)
         emit_json(payload)
 
-    cap_path = _namespace_get(args, "output") or os.path.join(tempfile.gettempdir(), "printer_capabilities.json")
+    cap_path = _namespace_get(args, "output")
+    if not cap_path:
+        fd, cap_path = tempfile.mkstemp(prefix="printer_capabilities_", suffix=".json")
+        os.close(fd)
     cap_path = _expand_path(cap_path)
     if cap_path.startswith("-"):
         message = f"Invalid output path: {_path_for_message(cap_path)}"

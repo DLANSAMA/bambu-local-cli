@@ -86,9 +86,14 @@ class TestBambuDoctor(unittest.TestCase):
         cmd_doctor(args)
 
         self.assertTrue(any("✅ All checks passed!" in call[0][0] for call in mock_logger.info.call_args_list))
-        expected_path = os.path.join(tempfile.gettempdir(), "printer_capabilities.json")
-        any_caps_open = any(call[0][0] == expected_path and call[0][1] == "w" for call in mock_file_open.call_args_list)
-        self.assertTrue(any_caps_open, f"Expected {expected_path} to be opened for writing")
+        # Check that a file starting with printer_capabilities_ and ending in .json in tmpdir was opened
+        any_caps_open = any(
+            os.path.basename(call[0][0]).startswith("printer_capabilities_")
+            and call[0][0].endswith(".json")
+            and call[0][1] == "w"
+            for call in mock_file_open.call_args_list
+        )
+        self.assertTrue(any_caps_open, "Expected a randomly generated printer_capabilities_*.json to be opened for writing")
 
 
 class TestOfferPinFingerprint(unittest.TestCase):
