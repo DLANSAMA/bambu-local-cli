@@ -1,10 +1,14 @@
-# bambu-cli — CLI for Bambu Lab Printers
+# bambu-local-cli — Local CLI for Bambu Lab Printers
 
 [![CI](https://github.com/DLANSAMA/bambu-local-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/DLANSAMA/bambu-local-cli/actions/workflows/ci.yml)
 [![Release Packaging](https://github.com/DLANSAMA/bambu-local-cli/actions/workflows/release.yml/badge.svg)](https://github.com/DLANSAMA/bambu-local-cli/actions/workflows/release.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![PyPI](https://img.shields.io/pypi/v/bambu-local-cli)](https://pypi.org/project/bambu-local-cli/)
+[![Downloads](https://static.pepy.tech/badge/bambu-local-cli)](https://pepy.tech/projects/bambu-local-cli)
 
-Fully local 3D printing pipeline for Bambu Lab printers. Runs on **Linux, macOS, and Windows**. Download models from Printables, slice with OrcaSlicer, and print — all controlled via CLI by any AI agent or by hand. No cloud account needed.
+![bambu-local-cli demo: live printer status and slicing from the terminal](docs/demo.gif)
+
+Fully local 3D printing pipeline for Bambu Lab printers. Runs on **Linux, macOS, and Windows**. The installed command is `bambu-cli`. Download models from Printables, slice with OrcaSlicer, and print — all controlled via CLI by any AI agent or by hand. No cloud account needed.
 
 **Supports:** P1P, P1S, X1C, X1E, A1, A1 Mini (any Bambu printer with LAN mode)
 
@@ -17,6 +21,10 @@ Fully local 3D printing pipeline for Bambu Lab printers. Runs on **Linux, macOS,
 The examples below use the installed `bambu-cli` command.
 
 ```bash
+pipx install bambu-local-cli
+# or
+uv tool install bambu-local-cli
+# or
 pip install bambu-local-cli
 ```
 
@@ -52,6 +60,22 @@ bambu-cli --sim status
 ```
 
 Agents should add `--json` for machine-readable output: `bambu-cli --sim status --json`.
+
+## Use with AI agents
+
+`--json` is a global flag accepted by every command that produces structured output. Responses follow published JSON Schema files under [`docs/schemas/`](https://github.com/DLANSAMA/bambu-local-cli/tree/main/docs/schemas/) — agents can validate against them or use them to understand the exact shape of each response.
+
+`--sim` (simulation mode) replaces the real printer with a local stub, so an agent can develop, test, or exercise the full command surface without any hardware present.
+
+Destructive and physical actions — starting a print, stopping a job, deleting a file, or sending raw G-code — are gated behind an explicit `--confirm` flag. An agent that omits `--confirm` will receive an error rather than trigger an action on the printer, making accidental physical operations impossible by default.
+
+```bash
+# Inspect printer state without hardware
+bambu-cli --sim status --json
+
+# Start a full print workflow — requires --confirm to actually begin printing
+bambu-cli job <url> --json --confirm
+```
 
 ## Features
 
