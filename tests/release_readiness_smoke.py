@@ -72,6 +72,8 @@ FORBIDDEN_GENERATED_NAMES = {
 OBJECTIVE_SNIPPETS = {
     "README.md": {
         "Runs on **Linux, macOS, and Windows**",
+    },
+    "docs/manual.md": {
         "Use `job` when an agent or user gives either a website URL or a local file path",
     },
     "AGENTS.md": {"Runs on Linux, macOS, and Windows."},

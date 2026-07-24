@@ -14,6 +14,7 @@ REQUIRED_SDIST_FILES = {
     "AGENTS.md",
     "SECURITY.md",
     "CHANGELOG.md",
+    "docs/manual.md",
     "docs/api.md",
     "docs/schemas/error_envelope.json",
     "docs/schemas/job_ok.json",
@@ -134,6 +135,11 @@ REQUIRED_GITIGNORE_SNIPPETS = {
 
 REQUIRED_DOC_SNIPPETS = {
     "README.md": {
+        "docs/manual.md",
+        "docs/schemas/",
+        "SECURITY.md",
+    },
+    "docs/manual.md": {
         "`--json` | Emit JSON for commands that support it; may appear before or after the subcommand",
         "`plate --json --version` emits",
         "STL > STEP > OBJ > 3MF > G-code",
